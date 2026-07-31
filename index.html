@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Self-Hosted LLM Cost Calculator</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <style>
   :root {
     --surface-1: #fcfcfb;
@@ -41,6 +43,9 @@
     padding: 12px 20px 8px;
     border-bottom: 1px solid var(--gridline);
     background: var(--surface-1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   h1 {
@@ -52,6 +57,28 @@
   .subtitle {
     font-size: 12px;
     color: var(--text-secondary);
+  }
+
+  .btn-pdf {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-secondary);
+    background: var(--surface-1);
+    border: 1px solid var(--baseline);
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-pdf:hover {
+    border-color: var(--cat-1);
+    color: var(--cat-1);
+  }
+  .btn-pdf:disabled {
+    opacity: 0.5;
+    cursor: wait;
   }
 
   .layout {
@@ -311,13 +338,25 @@
     text-align: center;
     padding: 4px 0;
   }
+
+  @media print {
+    html, body { overflow: visible; height: auto; }
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .sidebar { overflow: visible; max-height: none; border-right: none; }
+    .main { overflow: visible; height: auto; }
+    .chart-wrap { min-height: 400px; flex: none; }
+    .btn-pdf { display: none; }
+  }
 </style>
 </head>
 <body>
 
 <div class="top-bar">
-  <h1>Self-Hosted LLM Cost Calculator</h1>
-  <p class="subtitle">Compare self-hosted open-weight model costs against frontier API providers</p>
+  <div>
+    <h1>Self-Hosted LLM Cost Calculator</h1>
+    <p class="subtitle">Compare self-hosted open-weight model costs against frontier API providers</p>
+  </div>
+  <button class="btn-pdf" id="btnPdf">Download PDF</button>
 </div>
 
 <div class="layout">
@@ -865,6 +904,111 @@
   // --- Wire up inputs ---
   document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser').forEach(inp => {
     inp.addEventListener('input', render);
+  });
+
+  // --- PDF download ---
+  $('btnPdf').addEventListener('click', async function () {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+      const layout = document.querySelector('.layout');
+      const sidebar = document.querySelector('.sidebar');
+      const main = document.querySelector('.main');
+
+      // Save current styles
+      const savedHtml = { overflow: document.documentElement.style.overflow };
+      const savedBody = { overflow: document.body.style.overflow };
+      const savedLayout = {
+        gridTemplateColumns: layout.style.gridTemplateColumns,
+        height: layout.style.height,
+      };
+      const savedSidebar = {
+        overflowY: sidebar.style.overflowY,
+        maxHeight: sidebar.style.maxHeight,
+        borderRight: sidebar.style.borderRight,
+      };
+      const savedMain = {
+        overflowY: main.style.overflowY,
+        height: main.style.height,
+      };
+      const savedChart = {
+        minHeight: document.querySelector('.chart-wrap').style.minHeight,
+        flex: document.querySelector('.chart-wrap').style.flex,
+        height: document.querySelector('.chart-wrap').style.height,
+      };
+
+      // Switch to single-column flow for capture
+      document.documentElement.style.overflow = 'visible';
+      document.body.style.overflow = 'visible';
+      layout.style.gridTemplateColumns = '1fr';
+      layout.style.height = 'auto';
+      sidebar.style.overflowY = 'visible';
+      sidebar.style.maxHeight = 'none';
+      sidebar.style.borderRight = 'none';
+      main.style.overflowY = 'visible';
+      main.style.height = 'auto';
+      const chartWrap = document.querySelector('.chart-wrap');
+      chartWrap.style.minHeight = '400px';
+      chartWrap.style.flex = 'none';
+      chartWrap.style.height = '400px';
+
+      // Re-render chart at fixed size for capture
+      render();
+
+      // Small delay for reflow
+      await new Promise(r => setTimeout(r, 100));
+
+      const canvas = await html2canvas(layout, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#f9f9f7',
+        logging: false,
+      });
+
+      // Restore layout
+      document.documentElement.style.overflow = savedHtml.overflow;
+      document.body.style.overflow = savedBody.overflow;
+      layout.style.gridTemplateColumns = savedLayout.gridTemplateColumns;
+      layout.style.height = savedLayout.height;
+      sidebar.style.overflowY = savedSidebar.overflowY;
+      sidebar.style.maxHeight = savedSidebar.maxHeight;
+      sidebar.style.borderRight = savedSidebar.borderRight;
+      main.style.overflowY = savedMain.overflowY;
+      main.style.height = savedMain.height;
+      chartWrap.style.minHeight = savedChart.minHeight;
+      chartWrap.style.flex = savedChart.flex;
+      chartWrap.style.height = savedChart.height;
+
+      render();
+
+      // Generate PDF
+      const { jsPDF } = window.jspdf;
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      // Use landscape if content is wider than tall, portrait otherwise
+      const orientation = imgWidth > imgHeight ? 'l' : 'p';
+      const pdf = new jsPDF(orientation, 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth() - 20;
+      const pageHeight = pdf.internal.pageSize.getHeight() - 20;
+      const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+      const pdfW = imgWidth * ratio;
+      const pdfH = imgHeight * ratio;
+
+      pdf.addImage(imgData, 'PNG', 10, 10, pdfW, pdfH);
+
+      const today = new Date().toISOString().slice(0, 10);
+      pdf.save(`llm-cost-scenario-${today}.pdf`);
+    } catch (e) {
+      console.error('PDF generation error:', e);
+      alert('PDF generation failed. See console for details.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Download PDF';
+    }
   });
 
   // --- Init ---
