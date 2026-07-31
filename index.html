@@ -338,7 +338,17 @@
       <div class="section-label">Infrastructure</div>
       <div class="field-row">
         <div class="field">
-          <label>GPU nodes (8xH200)</label>
+          <label>GPU type</label>
+          <input type="text" id="gpuType" value="H200" placeholder="e.g. H200, H100, A100">
+        </div>
+        <div class="field">
+          <label>GPUs per node</label>
+          <input type="number" id="gpusPerNode" value="8" min="1" max="16" step="1">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Number of nodes</label>
           <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
         </div>
         <div class="field">
@@ -396,7 +406,7 @@
       </div>
 
       <div class="computed-box">
-        <div>Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; Pilot: <span class="val" id="pilotCost">—</span></div>
+        <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; Pilot: <span class="val" id="pilotCost">—</span></div>
         <div>I:O goodput ratio: <span class="val" id="ioRatio">—</span> &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
           Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
@@ -619,6 +629,8 @@
 
   // --- Core cost computation ---
   function compute() {
+    const gpuType = $('gpuType').value.trim() || 'GPU';
+    const gpusPerNode = val('gpusPerNode');
     const numNodes = val('numNodes');
     const costPerNode = val('costPerNode');
     const otherCost = val('otherCost');
@@ -629,6 +641,7 @@
     const avgIsl = val('avgIsl');
     const avgOsl = val('avgOsl');
 
+    const totalGpus = numNodes * gpusPerNode;
     const monthlyCost = numNodes * costPerNode + otherCost;
     const annualTco = monthlyCost * 12;
     const pilotCost = monthlyCost * pilotMonths;
@@ -643,6 +656,7 @@
     const uncachedFrac = inputFrac * (1 - cacheHitPct);
 
     // Update computed display
+    $('totalGpus').textContent = `${totalGpus}× ${esc(gpuType)}`;
     $('annualTco').textContent = fmtDollar(annualTco);
     $('pilotCost').textContent = fmtDollar(pilotCost);
     $('ioRatio').textContent = outputTps > 0 ? (inputTps / outputTps).toFixed(2) + ':1' : 'N/A';
@@ -655,6 +669,7 @@
       `regardless of token type. Every token &mdash; prefill or decode &mdash; ` +
       `uses the same fixed GPU pool.<br><br>` +
       `<strong>Derivation:</strong><br>` +
+      `&bull; Infra: ${numNodes} nodes &times; ${gpusPerNode} ${esc(gpuType)}/node = <strong>${totalGpus} GPUs</strong><br>` +
       `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 + $${fmt(otherCost * 12)} = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
       `&bull; Goodput = ${fmt(outputTps, 0)} out + ${fmt(inputTps, 0)} in = <strong>${fmt(totalTps, 0)} tok/s</strong><br>` +
       `&bull; Annual tokens = ${fmt(totalTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
@@ -848,7 +863,7 @@
   }
 
   // --- Wire up inputs ---
-  document.querySelectorAll('#numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser').forEach(inp => {
+  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser').forEach(inp => {
     inp.addEventListener('input', render);
   });
 
