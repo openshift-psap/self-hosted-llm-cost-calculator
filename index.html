@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Self-Hosted LLM Cost Calculator</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <style>
   :root {
     --surface-1: #fcfcfb;
@@ -59,7 +57,7 @@
     color: var(--text-secondary);
   }
 
-  .btn-pdf {
+  .btn-print {
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
@@ -72,14 +70,77 @@
     white-space: nowrap;
     transition: border-color 0.15s, color 0.15s;
   }
-  .btn-pdf:hover {
+  .btn-print:hover {
     border-color: var(--cat-1);
     color: var(--cat-1);
   }
-  .btn-pdf:disabled {
-    opacity: 0.5;
-    cursor: wait;
+
+  .scenario-fields {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 2px;
   }
+  .scenario-fields input, .scenario-fields textarea {
+    padding: 4px 8px;
+    border: 1px solid var(--baseline);
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface-1);
+    color: var(--text-primary);
+  }
+  .scenario-fields input:focus, .scenario-fields textarea:focus {
+    outline: none;
+    border-color: var(--cat-1);
+    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
+  }
+  .scenario-fields input { width: 260px; }
+  .scenario-fields textarea { width: 400px; height: 28px; resize: vertical; }
+
+  #printOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: #fcfcfb;
+    overflow: auto;
+    padding: 28px;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #0b0b0b;
+  }
+  #printOverlay.active { display: block; }
+  #printOverlay .print-close {
+    position: fixed;
+    top: 12px;
+    right: 20px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--surface-1);
+    border: 1px solid var(--baseline);
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+  #printOverlay .print-close:hover { border-color: var(--cat-1); color: var(--cat-1); }
+  #printOverlay .print-actions {
+    position: fixed;
+    top: 12px;
+    right: 100px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--cat-1);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+  #printOverlay .print-actions:hover { opacity: 0.9; }
 
   .layout {
     display: grid;
@@ -340,12 +401,11 @@
   }
 
   @media print {
-    html, body { overflow: visible; height: auto; }
-    .layout { grid-template-columns: 1fr; height: auto; }
-    .sidebar { overflow: visible; max-height: none; border-right: none; }
-    .main { overflow: visible; height: auto; }
-    .chart-wrap { min-height: 400px; flex: none; }
-    .btn-pdf { display: none; }
+    .top-bar, .layout { display: none !important; }
+    #printOverlay { display: block !important; position: static !important; overflow: visible !important; }
+    #printOverlay .print-close, #printOverlay .print-actions { display: none !important; }
+    body { overflow: visible !important; height: auto !important; }
+    html { overflow: visible !important; height: auto !important; }
   }
 </style>
 </head>
@@ -354,9 +414,18 @@
 <div class="top-bar">
   <div>
     <h1>Self-Hosted LLM Cost Calculator</h1>
-    <p class="subtitle">Compare self-hosted open-weight model costs against frontier API providers</p>
+    <div class="scenario-fields">
+      <input type="text" id="scenarioName" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
+      <textarea id="scenarioDesc" placeholder="Description (optional)"></textarea>
+    </div>
   </div>
-  <button class="btn-pdf" id="btnPdf">Download PDF</button>
+  <button class="btn-print" id="btnPrint">Print</button>
+</div>
+
+<div id="printOverlay">
+  <button class="print-actions" id="printNow">Print / Save PDF</button>
+  <button class="print-close" id="printClose">Close</button>
+  <div id="printContent"></div>
 </div>
 
 <div class="layout">
@@ -906,12 +975,21 @@
     inp.addEventListener('input', render);
   });
 
-  // --- PDF download ---
-  function buildPdfContent() {
+  // --- Print ---
+  function showPrintView() {
     const gpuType = $('gpuType').value.trim() || 'GPU';
     const gpusPerNode = val('gpusPerNode');
     const numNodes = val('numNodes');
     const totalGpus = numNodes * gpusPerNode;
+    const scenarioName = $('scenarioName').value.trim();
+    const scenarioDesc = $('scenarioDesc').value.trim();
+
+    const titleHtml = scenarioName
+      ? `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">${esc(scenarioName)}</h1>`
+      : `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">Self-Hosted LLM Cost Scenario</h1>`;
+    const descHtml = scenarioDesc
+      ? `<p style="font-size:12px;color:#52514e;margin:0 0 4px;">${esc(scenarioDesc)}</p>`
+      : '';
 
     const rows = [
       ['Model', selectedModel],
@@ -944,16 +1022,12 @@
     }).join('');
 
     const breakevenHtml = $('breakevenBody').innerHTML;
+    const chartImg = $('costChart').toDataURL('image/png');
 
-    const chartCanvas = $('costChart');
-    const chartImg = chartCanvas.toDataURL('image/png');
-
-    const container = document.createElement('div');
-    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;background:#fcfcfb;font-family:system-ui,-apple-system,sans-serif;padding:28px;color:#0b0b0b;';
-
-    container.innerHTML = `
-      <h1 style="font-size:20px;font-weight:700;margin:0 0 4px;">Self-Hosted LLM Cost Calculator</h1>
-      <p style="font-size:12px;color:#52514e;margin:0 0 20px;">Scenario exported ${new Date().toLocaleDateString()}</p>
+    $('printContent').innerHTML = `
+      ${titleHtml}
+      ${descHtml}
+      <p style="font-size:11px;color:#898781;margin:0 0 20px;">${new Date().toLocaleDateString()}</p>
 
       <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
         <div>
@@ -973,7 +1047,7 @@
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Frontier Model</th>
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Blended $/M</th>
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Breakeven Util.</th>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Monthly Frontier Cost at Self-Hosted Volume</th>
+              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Monthly Frontier Cost</th>
             </tr>
           </thead>
           <tbody>${breakevenHtml}</tbody>
@@ -985,52 +1059,12 @@
       </p>
     `;
 
-    return container;
+    $('printOverlay').classList.add('active');
   }
 
-  $('btnPdf').addEventListener('click', async function () {
-    const btn = this;
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
-
-    try {
-      const container = buildPdfContent();
-      document.body.appendChild(container);
-
-      await new Promise(r => setTimeout(r, 50));
-
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#fcfcfb',
-        logging: false,
-      });
-
-      document.body.removeChild(container);
-
-      const { jsPDF } = window.jspdf;
-      const imgData = canvas.toDataURL('image/png');
-      const imgW = canvas.width;
-      const imgH = canvas.height;
-
-      const orientation = imgW > imgH ? 'l' : 'p';
-      const pdf = new jsPDF(orientation, 'mm', 'a4');
-      const pageW = pdf.internal.pageSize.getWidth() - 20;
-      const pageH = pdf.internal.pageSize.getHeight() - 20;
-      const ratio = Math.min(pageW / imgW, pageH / imgH);
-
-      pdf.addImage(imgData, 'PNG', 10, 10, imgW * ratio, imgH * ratio);
-
-      const today = new Date().toISOString().slice(0, 10);
-      pdf.save(`llm-cost-scenario-${today}.pdf`);
-    } catch (e) {
-      console.error('PDF generation error:', e);
-      alert('PDF generation failed. See console for details.');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Download PDF';
-    }
-  });
+  $('btnPrint').addEventListener('click', () => showPrintView());
+  $('printClose').addEventListener('click', () => $('printOverlay').classList.remove('active'));
+  $('printNow').addEventListener('click', () => window.print());
 
   // --- Init ---
   renderSelectedModel();
