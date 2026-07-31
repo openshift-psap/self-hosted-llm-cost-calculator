@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Hosted LLM Cost Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page-plane: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --self-hosted: #CC0000;
+    --cat-1: #2a78d6;
+    --cat-2: #eb6834;
+    --cat-3: #1baf7a;
+    --cat-4: #eda100;
+    --cat-5: #e87ba4;
+    --cat-6: #008300;
+    --cat-7: #4a3aa7;
+    --cat-8: #e34948;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 800px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--gridline);
+  }
+
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--baseline);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface-1);
+    color: var(--text-primary);
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--cat-1);
+    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .computed-box {
+    background: var(--page-plane);
+    border: 1px solid var(--gridline);
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .computed-box .val { font-weight: 700; color: var(--text-primary); }
+
+  .hf-search-wrap { position: relative; }
+  .hf-results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 10;
+    background: var(--surface-1);
+    border: 1px solid var(--baseline);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+  }
+  .hf-results.open { display: block; }
+  .hf-result {
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--gridline);
+  }
+  .hf-result:hover { background: var(--page-plane); }
+  .hf-result .dl { color: var(--text-muted); font-size: 10px; }
+  .selected-model {
+    display: inline-block;
+    background: var(--cat-1);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-top: 4px;
+  }
+
+  .frontier-list { list-style: none; }
+  .frontier-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 6px;
+    align-items: start;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gridline);
+    font-size: 12px;
+  }
+  .frontier-item:last-child { border-bottom: none; }
+  .frontier-item input[type="checkbox"] {
+    margin-top: 3px;
+    accent-color: var(--cat-1);
+  }
+  .frontier-name { font-weight: 600; margin-bottom: 2px; }
+  .frontier-prices {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .frontier-prices label {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .frontier-prices input {
+    width: 100%;
+    padding: 3px 5px;
+    border: 1px solid var(--gridline);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .frontier-blended {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .chart-wrap {
+    background: var(--surface-1);
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .breakeven-table {
+    background: var(--surface-1);
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .breakeven-table h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .breakeven-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .breakeven-table th {
+    text-align: left;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--baseline);
+  }
+  .breakeven-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  .breakeven-table .swatch {
+    display: inline-block;
+    width: 12px; height: 3px;
+    border-radius: 1px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .loading-msg {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 0;
+  }
+
+  .footer-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Self-Hosted LLM Cost Calculator</h1>
+<p class="subtitle">Compare self-hosted open-weight model inference costs against frontier API providers. Adjust parameters to explore the economics.</p>
+
+<div class="panels">
+
+  <!-- LEFT PANEL: Self-hosted -->
+  <div class="panel">
+    <div class="panel-title">Self-Hosted Model</div>
+
+    <div class="field hf-search-wrap">
+      <label>Model (search HuggingFace)</label>
+      <input type="text" id="hfSearch" placeholder="Search models... e.g. GLM-5.2" autocomplete="off">
+      <div class="hf-results" id="hfResults"></div>
+    </div>
+    <div id="selectedModelWrap"></div>
+
+    <div style="margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Infrastructure</div>
+    <div class="field-row">
+      <div class="field">
+        <label>GPU nodes (8xH200 each)</label>
+        <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
+      </div>
+      <div class="field">
+        <label>Cost per node / month ($)</label>
+        <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Other monthly costs ($)</label>
+        <input type="number" id="otherCost" value="900" min="0" step="100">
+      </div>
+      <div class="field">
+        <label>Pilot duration (months)</label>
+        <input type="number" id="pilotMonths" value="6" min="1" max="60" step="1">
+      </div>
+    </div>
+
+    <div style="margin-top: 12px; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Workload Shape</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Concurrency (session trees)</label>
+        <input type="number" id="concurrency" value="128" min="1" step="1">
+      </div>
+      <div class="field">
+        <label>Avg input sequence length (tokens)</label>
+        <input type="number" id="avgIsl" value="30000" min="1" step="1000">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Avg output sequence length (tokens)</label>
+        <input type="number" id="avgOsl" value="2000" min="1" step="100">
+      </div>
+      <div class="field">
+        <label>Input token cache hit rate (%)</label>
+        <input type="number" id="cacheHitRate" value="87" min="0" max="100" step="1">
+      </div>
+    </div>
+
+    <div style="margin-top: 12px; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Serving Performance (goodput at above workload shape)</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Output goodput (tok/sec)</label>
+        <input type="number" id="outputTps" value="6000" min="1" step="100">
+      </div>
+      <div class="field">
+        <label>Input goodput (tok/sec)</label>
+        <input type="number" id="inputTps" value="13000" min="1" step="100">
+      </div>
+    </div>
+    <div class="field">
+      <label>p50 E2E latency (seconds)</label>
+      <input type="number" id="p50Latency" value="15" min="0.1" step="0.5">
+    </div>
+
+    <div class="computed-box">
+      <div>Annual TCO: <span class="val" id="annualTco">$1,124,597</span></div>
+      <div>Pilot cost: <span class="val" id="pilotCost">$562,298</span></div>
+      <div>Input:Output goodput ratio: <span class="val" id="ioRatio">2.17:1</span></div>
+      <div>Workload ISL:OSL ratio: <span class="val" id="islOslRatio">15.0:1</span></div>
+      <div style="margin-top: 6px; border-top: 1px solid var(--gridline); padding-top: 6px;">
+        <div style="font-size: 12px; margin-bottom: 4px;">Self-hosted cost at 100% utilization: <span class="val" id="shCostPerM" style="font-size: 14px;">—</span>/M tokens</div>
+        <div style="font-size: 10px; color: var(--text-muted); line-height: 1.6;" id="mathExplanation"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Frontier models -->
+  <div class="panel">
+    <div class="panel-title">Frontier API Pricing <span style="font-weight: 400; text-transform: none; font-size: 10px; color: var(--text-muted);">(live from OpenRouter)</span></div>
+    <div id="frontierLoading" class="loading-msg">Loading pricing from OpenRouter...</div>
+    <ul class="frontier-list" id="frontierList"></ul>
+  </div>
+
+</div>
+
+<!-- CHART -->
+<div class="chart-wrap">
+  <canvas id="costChart"></canvas>
+</div>
+
+<!-- BREAKEVEN TABLE -->
+<div class="breakeven-table">
+  <h3>Breakeven Summary</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Frontier Model</th>
+        <th>Blended $/M Total Tokens</th>
+        <th>Breakeven Utilization</th>
+        <th>Monthly Frontier Cost at Self-Hosted Volume</th>
+      </tr>
+    </thead>
+    <tbody id="breakevenBody"></tbody>
+  </table>
+</div>
+
+<p class="footer-note">
+  Frontier pricing via <a href="https://openrouter.ai" style="color: var(--cat-1);">OpenRouter API</a>.
+  Model search via <a href="https://huggingface.co" style="color: var(--cat-1);">HuggingFace Hub API</a>.
+  Blended cost accounts for input:output ratio and prompt cache hit rate from agentic workloads.
+</p>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const SECS_PER_YEAR = 365.25 * 24 * 3600;
+  const COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948'];
+  const SELF_HOSTED_COLOR = '#CC0000';
+
+  const PRELOAD_IDS = [
+    'anthropic/claude-opus-4.8',
+    'anthropic/claude-sonnet-5',
+    'openai/gpt-5.6-terra',
+    'openai/gpt-5.6-sol',
+    'google/gemini-3.6-flash',
+    'deepseek/deepseek-v4',
+  ];
+  const DEFAULT_CHECKED = new Set(PRELOAD_IDS.slice(0, 4));
+
+  const $ = id => document.getElementById(id);
+  const val = id => parseFloat($(id).value) || 0;
+  const fmt = (n, d = 2) => n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtDollar = (n, d = 0) => '$' + n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  let frontierModels = [];
+  let chart = null;
+  let hfDebounce = null;
+  let selectedModel = 'GLM-5.2';
+
+  // --- HuggingFace model search ---
+  const hfInput = $('hfSearch');
+  const hfResults = $('hfResults');
+
+  hfInput.addEventListener('input', () => {
+    clearTimeout(hfDebounce);
+    const q = hfInput.value.trim();
+    if (q.length < 2) { hfResults.classList.remove('open'); return; }
+    hfDebounce = setTimeout(() => searchHF(q), 300);
+  });
+
+  hfInput.addEventListener('focus', () => {
+    if (hfResults.children.length > 0) hfResults.classList.add('open');
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.hf-search-wrap')) hfResults.classList.remove('open');
+  });
+
+  async function searchHF(query) {
+    try {
+      const r = await fetch(`https://huggingface.co/api/models?search=${encodeURIComponent(query)}&pipeline_tag=text-generation&sort=downloads&direction=-1&limit=15`);
+      const data = await r.json();
+      hfResults.innerHTML = '';
+      data.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'hf-result';
+        const dlText = m.downloads ? `${(m.downloads / 1000).toFixed(0)}k downloads` : '';
+        div.innerHTML = `<div>${esc(m.id)}</div><div class="dl">${esc(dlText)}</div>`;
+        div.addEventListener('click', () => {
+          selectedModel = m.id;
+          hfInput.value = '';
+          hfResults.classList.remove('open');
+          renderSelectedModel();
+          render();
+        });
+        hfResults.appendChild(div);
+      });
+      hfResults.classList.add('open');
+    } catch (e) {
+      console.error('HF search error:', e);
+    }
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderSelectedModel() {
+    $('selectedModelWrap').innerHTML = `<span class="selected-model">${esc(selectedModel)}</span>`;
+  }
+
+  // --- OpenRouter frontier pricing ---
+  async function loadFrontierPricing() {
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/models');
+      const data = await r.json();
+      const modelMap = new Map();
+      (data.data || data).forEach(m => modelMap.set(m.id, m));
+
+      frontierModels = PRELOAD_IDS.map((id, i) => {
+        const m = modelMap.get(id);
+        if (!m) return null;
+        const p = m.pricing || {};
+        return {
+          id: m.id,
+          name: m.name || m.id,
+          inputPrice: parseFloat(p.prompt || 0) * 1e6,
+          cachedPrice: parseFloat(p.input_cache_read || 0) * 1e6,
+          outputPrice: parseFloat(p.completion || 0) * 1e6,
+          checked: DEFAULT_CHECKED.has(id),
+          color: COLORS[i % COLORS.length],
+        };
+      }).filter(Boolean);
+
+      $('frontierLoading').style.display = 'none';
+      renderFrontierList();
+      render();
+    } catch (e) {
+      $('frontierLoading').textContent = 'Failed to load pricing. Using defaults.';
+      console.error('OpenRouter error:', e);
+      useFallbackPricing();
+    }
+  }
+
+  function useFallbackPricing() {
+    frontierModels = [
+      { id: 'anthropic/claude-opus-4.8', name: 'Claude Opus 4.8', inputPrice: 5, cachedPrice: 0.5, outputPrice: 25, checked: true, color: COLORS[0] },
+      { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet 5', inputPrice: 3, cachedPrice: 0.3, outputPrice: 15, checked: true, color: COLORS[1] },
+      { id: 'openai/gpt-5.6-terra', name: 'GPT-5.6 Terra', inputPrice: 2.5, cachedPrice: 0.25, outputPrice: 15, checked: true, color: COLORS[2] },
+      { id: 'openai/gpt-5.6-sol', name: 'GPT-5.6 Sol', inputPrice: 5, cachedPrice: 0.5, outputPrice: 30, checked: true, color: COLORS[3] },
+      { id: 'google/gemini-3.6-flash', name: 'Gemini 3.6 Flash', inputPrice: 1.5, cachedPrice: 0.15, outputPrice: 7.5, checked: false, color: COLORS[4] },
+      { id: 'deepseek/deepseek-v4', name: 'DeepSeek V4', inputPrice: 0.14, cachedPrice: 0.003, outputPrice: 0.28, checked: false, color: COLORS[5] },
+    ];
+    $('frontierLoading').style.display = 'none';
+    renderFrontierList();
+    render();
+  }
+
+  function renderFrontierList() {
+    const list = $('frontierList');
+    list.innerHTML = '';
+    frontierModels.forEach((m, i) => {
+      const li = document.createElement('li');
+      li.className = 'frontier-item';
+      li.innerHTML = `
+        <input type="checkbox" data-idx="${i}" ${m.checked ? 'checked' : ''}>
+        <div>
+          <div class="frontier-name" style="color: ${m.color};">${esc(m.name)}</div>
+          <div class="frontier-prices">
+            <div><label>Input $/M</label><input type="number" data-idx="${i}" data-field="inputPrice" value="${m.inputPrice}" min="0" step="0.1"></div>
+            <div><label>Cached $/M</label><input type="number" data-idx="${i}" data-field="cachedPrice" value="${m.cachedPrice}" min="0" step="0.01"></div>
+            <div><label>Output $/M</label><input type="number" data-idx="${i}" data-field="outputPrice" value="${m.outputPrice}" min="0" step="0.5"></div>
+          </div>
+          <div class="frontier-blended" id="blended-${i}"></div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+
+    list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        frontierModels[+e.target.dataset.idx].checked = e.target.checked;
+        render();
+      });
+    });
+    list.querySelectorAll('input[type="number"]').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const m = frontierModels[+e.target.dataset.idx];
+        m[e.target.dataset.field] = parseFloat(e.target.value) || 0;
+        render();
+      });
+    });
+  }
+
+  // --- Core cost computation ---
+  function compute() {
+    const numNodes = val('numNodes');
+    const costPerNode = val('costPerNode');
+    const otherCost = val('otherCost');
+    const pilotMonths = val('pilotMonths');
+    const outputTps = val('outputTps');
+    const inputTps = val('inputTps');
+    const cacheHitPct = val('cacheHitRate') / 100;
+    const avgIsl = val('avgIsl');
+    const avgOsl = val('avgOsl');
+
+    const monthlyCost = numNodes * costPerNode + otherCost;
+    const annualTco = monthlyCost * 12;
+    const pilotCost = monthlyCost * pilotMonths;
+    const totalTps = outputTps + inputTps;
+
+    // Annual tokens at 100% utilization
+    const annualTotalTokens = totalTps * SECS_PER_YEAR;
+
+    // Self-hosted cost per M tokens at 100%
+    // Key insight: unlike frontier APIs which charge differently for input vs output,
+    // self-hosted infrastructure has a single fixed cost regardless of token type.
+    // Every token — whether input (cached or uncached) or output — consumes GPU
+    // compute from the same fixed pool. The cost per token is simply:
+    //   Annual TCO / Annual tokens produced at full utilization
+    const costPerMAt100 = annualTotalTokens > 0 ? annualTco / (annualTotalTokens / 1e6) : 0;
+
+    // Fractions for blended frontier comparison
+    const inputFrac = totalTps > 0 ? inputTps / totalTps : 0;
+    const outputFrac = totalTps > 0 ? outputTps / totalTps : 0;
+    const cachedFrac = inputFrac * cacheHitPct;
+    const uncachedFrac = inputFrac * (1 - cacheHitPct);
+
+    // Update computed display
+    $('annualTco').textContent = fmtDollar(annualTco);
+    $('pilotCost').textContent = fmtDollar(pilotCost);
+    $('ioRatio').textContent = outputTps > 0 ? (inputTps / outputTps).toFixed(2) + ':1' : 'N/A';
+    $('islOslRatio').textContent = avgOsl > 0 ? (avgIsl / avgOsl).toFixed(1) + ':1' : 'N/A';
+    $('shCostPerM').textContent = '$' + fmt(costPerMAt100, 4);
+
+    // Show the math
+    const annualTokensB = (annualTotalTokens / 1e9).toFixed(1);
+    $('mathExplanation').innerHTML =
+      `<strong>Why one cost for all token types?</strong> Unlike frontier APIs that charge separately ` +
+      `for input, cached input, and output tokens, self-hosted infrastructure has a fixed cost ` +
+      `regardless of token type. Every token &mdash; whether prefill (cached or uncached) or decode &mdash; ` +
+      `consumes GPU compute from the same fixed hardware pool.<br><br>` +
+      `<strong>Derivation:</strong><br>` +
+      `&bull; Annual TCO = ${numNodes} nodes &times; $${fmt(costPerNode)}/mo &times; 12 + $${fmt(otherCost * 12)} other = <strong>${fmtDollar(annualTco)}</strong><br>` +
+      `&bull; Total goodput = ${fmt(outputTps, 0)} output + ${fmt(inputTps, 0)} input = <strong>${fmt(totalTps, 0)} tok/sec</strong><br>` +
+      `&bull; Annual tokens at 100% util = ${fmt(totalTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} sec/yr = <strong>${annualTokensB}B tokens</strong><br>` +
+      `&bull; Cost/M tokens = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 4)}/M</strong><br><br>` +
+      `At lower utilization, cost scales inversely: cost at U% = $${fmt(costPerMAt100, 4)} &divide; (U/100).`;
+
+    // Self-hosted blended cost curve (1-100% utilization)
+    const utilizations = [];
+    const selfHostedCosts = [];
+    for (let u = 1; u <= 100; u++) {
+      utilizations.push(u);
+      selfHostedCosts.push(costPerMAt100 / (u / 100));
+    }
+
+    // Frontier blended costs
+    const frontierResults = frontierModels.filter(m => m.checked).map(m => {
+      const blended = uncachedFrac * m.inputPrice
+                    + cachedFrac * m.cachedPrice
+                    + outputFrac * m.outputPrice;
+
+      const breakeven = blended > 0 ? (costPerMAt100 / blended) * 100 : Infinity;
+
+      // Monthly frontier cost at the self-hosted volume (25% util as reference)
+      const monthlyTokensAt25 = annualTotalTokens * 0.25 / 12;
+      const monthlyFrontierCost = blended * (monthlyTokensAt25 / 1e6);
+
+      const el = document.getElementById('blended-' + frontierModels.indexOf(m));
+      if (el) el.textContent = `Blended: $${fmt(blended)}/M total tokens`;
+
+      return { ...m, blended, breakeven, monthlyFrontierCost };
+    });
+
+    return { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens };
+  }
+
+  // --- Chart rendering ---
+  function render() {
+    const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens } = compute();
+
+    const maxFrontier = Math.max(...frontierResults.map(f => f.blended), 0);
+    const maxY = Math.min(
+      Math.max(selfHostedCosts[4] || 30, maxFrontier * 1.2, 10),
+      100
+    );
+
+    const datasets = [
+      {
+        label: `Self-Hosted ${selectedModel}`,
+        data: selfHostedCosts,
+        borderColor: SELF_HOSTED_COLOR,
+        backgroundColor: 'rgba(204,0,0,0.04)',
+        borderWidth: 2.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: SELF_HOSTED_COLOR,
+        pointHoverBorderColor: '#fcfcfb',
+        pointHoverBorderWidth: 2,
+        fill: false,
+        tension: 0.3,
+        order: 0,
+      },
+      ...frontierResults.map(m => ({
+        label: `${m.name} ($${fmt(m.blended)}/M)`,
+        data: Array(100).fill(m.blended),
+        borderColor: m.color,
+        borderWidth: 2,
+        borderDash: [8, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        order: 1,
+      })),
+    ];
+
+    if (chart) chart.destroy();
+
+    chart = new Chart($('costChart'), {
+      type: 'line',
+      data: { labels: utilizations, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
+        animation: { duration: 150 },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            title: { display: true, text: 'Average GPU Utilization (%)', font: { size: 12, family: 'system-ui' }, color: '#52514e' },
+            ticks: { stepSize: 10, color: '#898781', font: { size: 11 } },
+            grid: { color: '#e1e0d9', lineWidth: 1 },
+            border: { color: '#c3c2b7' },
+          },
+          y: {
+            title: { display: true, text: 'Blended Cost per 1M Total Tokens ($)', font: { size: 12, family: 'system-ui' }, color: '#52514e' },
+            min: 0,
+            max: maxY,
+            ticks: { color: '#898781', font: { size: 11 }, callback: v => '$' + v },
+            grid: { color: '#e1e0d9', lineWidth: 1 },
+            border: { color: '#c3c2b7' },
+          },
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              font: { size: 11, family: 'system-ui' },
+              color: '#52514e',
+              usePointStyle: true,
+              pointStyleWidth: 20,
+            },
+          },
+          tooltip: {
+            backgroundColor: '#fcfcfb',
+            titleColor: '#0b0b0b',
+            bodyColor: '#52514e',
+            borderColor: '#c3c2b7',
+            borderWidth: 1,
+            cornerRadius: 4,
+            padding: 10,
+            titleFont: { size: 12, weight: '700', family: 'system-ui' },
+            bodyFont: { size: 11, family: 'system-ui' },
+            callbacks: {
+              title: items => `Utilization: ${items[0].label}%`,
+              label: item => {
+                const name = item.dataset.label.split(' ($')[0];
+                return ` ${name}: $${item.parsed.y.toFixed(2)}/M`;
+              },
+            },
+          },
+        },
+      },
+      plugins: [{
+        id: 'breakevenDots',
+        afterDraw(chartInstance) {
+          const ctx = chartInstance.ctx;
+          const xScale = chartInstance.scales.x;
+          const yScale = chartInstance.scales.y;
+          frontierResults.forEach(m => {
+            if (m.breakeven >= 1 && m.breakeven <= 100 && m.blended <= maxY) {
+              const x = xScale.getPixelForValue(m.breakeven - 1);
+              const y = yScale.getPixelForValue(m.blended);
+              // Surface ring (2px)
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(x, y, 6, 0, Math.PI * 2);
+              ctx.fillStyle = '#fcfcfb';
+              ctx.fill();
+              // Mark
+              ctx.beginPath();
+              ctx.arc(x, y, 4, 0, Math.PI * 2);
+              ctx.fillStyle = m.color;
+              ctx.fill();
+              // Label
+              ctx.fillStyle = m.color;
+              ctx.font = '600 11px system-ui';
+              ctx.textContent;
+              ctx.fillText(Math.round(m.breakeven) + '%', x + 8, y - 6);
+              ctx.restore();
+            }
+          });
+        },
+      }],
+    });
+
+    // Breakeven table
+    const tbody = $('breakevenBody');
+    tbody.innerHTML = '';
+    frontierResults.forEach(m => {
+      const bePct = m.breakeven <= 100 ? Math.round(m.breakeven) + '%' : '>100%';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="swatch" style="background:${m.color};"></span>${esc(m.name)}</td>
+        <td>$${fmt(m.blended)}</td>
+        <td style="font-weight: 700;">${bePct}</td>
+        <td>${fmtDollar(m.monthlyFrontierCost)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // --- Wire up inputs ---
+  document.querySelectorAll('#numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #p50Latency').forEach(inp => {
+    inp.addEventListener('input', render);
+  });
+
+  // --- Init ---
+  renderSelectedModel();
+  loadFrontierPricing();
+
+})();
+</script>
+</body>
+</html>
