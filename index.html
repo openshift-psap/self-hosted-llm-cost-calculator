@@ -513,11 +513,39 @@
         <input type="number" id="outputTpsPerUser" value="32" min="0.1" step="1" style="width: calc(50% - 3px);">
       </div>
 
+      <div class="section-label">Demand Estimate</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Number of users</label>
+          <input type="number" id="numUsers" value="200" min="1" step="10">
+        </div>
+        <div class="field">
+          <label>Active hours / day</label>
+          <input type="number" id="activeHrs" value="8" min="0.5" max="24" step="0.5">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Duty cycle (% of active time generating tokens)</label>
+          <input type="number" id="dutyCycle" value="30" min="1" max="100" step="5">
+        </div>
+        <div class="field">
+          <label>Working days / month</label>
+          <input type="number" id="workDays" value="22" min="1" max="31" step="1">
+        </div>
+      </div>
+
       <div class="computed-box">
         <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; Pilot: <span class="val" id="pilotCost">—</span></div>
         <div>I:O goodput ratio: <span class="val" id="ioRatio">—</span> &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
           Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
+        </div>
+        <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
+          <div>Monthly token demand: <span class="val" id="monthlyDemand">—</span></div>
+          <div>Avg utilization: <span class="val" id="derivedUtil" style="font-size: 13px;">—</span> &nbsp; Self-hosted cost: <span class="val" id="shCostAtUtil" style="font-size: 13px;">—</span>/M</div>
+          <div>Peak-hour utilization: <span class="val" id="peakUtil">—</span></div>
+          <div id="peakWarning" style="display:none; font-size:10px; color:#e34948; margin-top:2px;"></div>
         </div>
         <div class="math-toggle" id="mathToggle">Show derivation</div>
         <div class="math-detail" id="mathExplanation"></div>
@@ -771,18 +799,74 @@
     $('islOslRatio').textContent = avgOsl > 0 ? (avgIsl / avgOsl).toFixed(1) + ':1' : 'N/A';
     $('shCostPerM').textContent = '$' + fmt(costPerMAt100, 4);
 
+    // --- Demand estimate ---
+    const numUsers = val('numUsers');
+    const activeHrs = val('activeHrs');
+    const dutyCyclePct = val('dutyCycle') / 100;
+    const workDays = val('workDays');
+    const outputPerUser = val('outputTpsPerUser');
+
+    const tokensPerTurn = avgIsl + avgOsl;
+    const timePerTurn = outputPerUser > 0 ? avgOsl / outputPerUser : 0;
+    const turnsPerEffHour = timePerTurn > 0 ? 3600 / timePerTurn : 0;
+    const effHoursPerUserMo = activeHrs * dutyCyclePct * workDays;
+    const tokensPerUserMo = turnsPerEffHour * tokensPerTurn * effHoursPerUserMo;
+    const monthlyDemand = numUsers * tokensPerUserMo;
+
+    const SECS_PER_MONTH = 30.44 * 86400;
+    const monthlySupply = totalTps * SECS_PER_MONTH;
+    const derivedUtil = monthlySupply > 0 ? (monthlyDemand / monthlySupply) * 100 : 0;
+
+    const avgConcurrent = numUsers * dutyCyclePct;
+    const tpsPerUserTotal = timePerTurn > 0 ? tokensPerTurn / timePerTurn : 0;
+    const peakTps = avgConcurrent * tpsPerUserTotal;
+    const peakUtil = totalTps > 0 ? (peakTps / totalTps) * 100 : 0;
+
+    const costAtDerivedUtil = derivedUtil > 0 ? costPerMAt100 / (Math.min(derivedUtil, 100) / 100) : 0;
+
+    // Update demand display
+    const demandB = (monthlyDemand / 1e9).toFixed(1);
+    $('monthlyDemand').textContent = `${demandB}B tokens/month`;
+    $('derivedUtil').textContent = fmt(derivedUtil, 1) + '%';
+    $('shCostAtUtil').textContent = '$' + fmt(derivedUtil > 100 ? costPerMAt100 : costAtDerivedUtil, 2);
+    $('peakUtil').textContent = fmt(peakUtil, 1) + '%';
+
+    const peakWarning = $('peakWarning');
+    if (peakUtil > 100) {
+      peakWarning.style.display = 'block';
+      peakWarning.textContent = `Peak demand (${fmt(peakTps, 0)} tok/s) exceeds capacity (${fmt(totalTps, 0)} tok/s). ` +
+        `Per-user throughput will degrade at peak, or add ~${Math.ceil(peakUtil / 100)} nodes.`;
+    } else {
+      peakWarning.style.display = 'none';
+    }
+
+    if (derivedUtil > 100) {
+      $('derivedUtil').style.color = '#e34948';
+    } else {
+      $('derivedUtil').style.color = '';
+    }
+
     const annualTokensB = (annualTotalTokens / 1e9).toFixed(1);
     $('mathExplanation').innerHTML =
       `<strong>Why one cost for all token types?</strong> Self-hosted hardware has a fixed cost ` +
       `regardless of token type. Every token &mdash; prefill or decode &mdash; ` +
       `uses the same fixed GPU pool.<br><br>` +
-      `<strong>Derivation:</strong><br>` +
+      `<strong>Cost derivation:</strong><br>` +
       `&bull; Infra: ${numNodes} nodes &times; ${gpusPerNode} ${esc(gpuType)}/node = <strong>${totalGpus} GPUs</strong><br>` +
       `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 + $${fmt(otherCost * 12)} = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
       `&bull; Goodput = ${fmt(outputTps, 0)} out + ${fmt(inputTps, 0)} in = <strong>${fmt(totalTps, 0)} tok/s</strong><br>` +
       `&bull; Annual tokens = ${fmt(totalTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
-      `&bull; Cost/M = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 4)}/M</strong><br>` +
-      `At U% util: $${fmt(costPerMAt100, 4)} &divide; (U/100)`;
+      `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 4)}/M</strong><br><br>` +
+      `<strong>Utilization derivation:</strong><br>` +
+      `&bull; Tokens/turn = ${fmt(avgIsl, 0)} ISL + ${fmt(avgOsl, 0)} OSL = <strong>${fmt(tokensPerTurn, 0)}</strong><br>` +
+      `&bull; Time/turn = ${fmt(avgOsl, 0)} OSL &divide; ${fmt(outputPerUser, 0)} tok/s/user = <strong>${fmt(timePerTurn, 1)}s</strong><br>` +
+      `&bull; Turns/eff-hour = 3600 &divide; ${fmt(timePerTurn, 1)} = <strong>${fmt(turnsPerEffHour, 1)}</strong><br>` +
+      `&bull; Eff hours/user/mo = ${fmt(activeHrs, 1)}h &times; ${fmt(dutyCyclePct * 100, 0)}% &times; ${fmt(workDays, 0)}d = <strong>${fmt(effHoursPerUserMo, 1)}h</strong><br>` +
+      `&bull; Tokens/user/mo = ${fmt(turnsPerEffHour, 1)} &times; ${fmt(tokensPerTurn, 0)} &times; ${fmt(effHoursPerUserMo, 1)} = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
+      `&bull; Monthly demand = ${fmt(numUsers, 0)} users &times; ${(tokensPerUserMo / 1e6).toFixed(1)}M = <strong>${demandB}B tokens</strong><br>` +
+      `&bull; Monthly supply = ${fmt(totalTps, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
+      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong><br>` +
+      `&bull; Peak concurrent = ${fmt(numUsers, 0)} &times; ${fmt(dutyCyclePct * 100, 0)}% = <strong>${fmt(avgConcurrent, 0)} users</strong> @ ${fmt(peakTps, 0)} tok/s (<strong>${fmt(peakUtil, 1)}%</strong> of capacity)`;
 
     // Self-hosted curve
     const utilizations = [];
@@ -826,12 +910,12 @@
       return { ...m, blended, breakeven, monthlyFrontierCost };
     });
 
-    return { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens };
+    return { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens, derivedUtil };
   }
 
   // --- Chart rendering ---
   function render() {
-    const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens } = compute();
+    const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens, derivedUtil } = compute();
 
     const maxFrontier = Math.max(...frontierResults.map(f => f.blended), 0);
     const maxY = Math.min(
@@ -926,11 +1010,13 @@
         },
       },
       plugins: [{
-        id: 'breakevenDots',
+        id: 'annotations',
         afterDraw(chartInstance) {
           const ctx = chartInstance.ctx;
           const xScale = chartInstance.scales.x;
           const yScale = chartInstance.scales.y;
+
+          // Breakeven dots
           frontierResults.forEach(m => {
             if (m.breakeven >= 1 && m.breakeven <= 100 && m.blended <= maxY) {
               const x = xScale.getPixelForValue(m.breakeven - 1);
@@ -950,6 +1036,51 @@
               ctx.restore();
             }
           });
+
+          // "Your scenario" marker
+          const clampedUtil = Math.min(derivedUtil, 100);
+          if (clampedUtil >= 1 && clampedUtil <= 100) {
+            const scenarioCost = costPerMAt100 / (clampedUtil / 100);
+            const x = xScale.getPixelForValue(clampedUtil - 1);
+            const yTop = yScale.top;
+            const yBottom = yScale.bottom;
+
+            ctx.save();
+            // Vertical dashed line
+            ctx.strokeStyle = SELF_HOSTED_COLOR;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, yTop);
+            ctx.lineTo(x, yBottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Dot on the curve
+            if (scenarioCost <= maxY) {
+              const y = yScale.getPixelForValue(scenarioCost);
+              ctx.beginPath();
+              ctx.arc(x, y, 7, 0, Math.PI * 2);
+              ctx.fillStyle = '#fcfcfb';
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(x, y, 5, 0, Math.PI * 2);
+              ctx.fillStyle = SELF_HOSTED_COLOR;
+              ctx.fill();
+
+              // Label
+              ctx.fillStyle = SELF_HOSTED_COLOR;
+              ctx.font = '700 10px system-ui';
+              const label = `Your scenario: ${fmt(clampedUtil, 1)}%`;
+              const labelWidth = ctx.measureText(label).width;
+              const labelX = x + 10 + labelWidth > xScale.right ? x - labelWidth - 10 : x + 10;
+              ctx.fillText(label, labelX, y - 10);
+              ctx.font = '600 9px system-ui';
+              ctx.fillText(`$${fmt(scenarioCost, 2)}/M`, labelX, y + 2);
+            }
+
+            ctx.restore();
+          }
         },
       }],
     });
@@ -971,7 +1102,7 @@
   }
 
   // --- Wire up inputs ---
-  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser').forEach(inp => {
+  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser, #numUsers, #activeHrs, #dutyCycle, #workDays').forEach(inp => {
     inp.addEventListener('input', render);
   });
 
@@ -1010,10 +1141,19 @@
       ['Input Goodput (tok/s)', fmt(val('inputTps'), 0)],
       ['Output tok/s per User', fmt(val('outputTpsPerUser'), 0)],
       ['', ''],
+      ['Number of Users', fmt(val('numUsers'), 0)],
+      ['Active Hours / Day', val('activeHrs')],
+      ['Duty Cycle', val('dutyCycle') + '%'],
+      ['Working Days / Month', val('workDays')],
+      ['', ''],
       ['Annual TCO', $('annualTco').textContent],
       ['Pilot Cost', $('pilotCost').textContent],
       ['I:O Goodput Ratio', $('ioRatio').textContent],
       ['Self-Hosted Cost/M (100%)', $('shCostPerM').textContent + '/M tokens'],
+      ['Monthly Token Demand', $('monthlyDemand').textContent],
+      ['Derived Avg Utilization', $('derivedUtil').textContent],
+      ['Self-Hosted Cost at Util.', $('shCostAtUtil').textContent + '/M tokens'],
+      ['Peak-Hour Utilization', $('peakUtil').textContent],
     ];
 
     const paramHtml = rows.map(([k, v]) => {
