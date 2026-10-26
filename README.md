@@ -6,10 +6,11 @@ Interactive tool for comparing the economics of self-hosted open-weight model in
 
 ## What it does
 
-Calculates the blended cost per million tokens for a self-hosted GPU deployment across 1–100% utilization, and plots it against frontier API costs (Claude, GPT, Gemini, DeepSeek) to show breakeven points.
+Calculates the blended cost per million tokens for a self-hosted GPU deployment across 1–100% utilization, and plots it against frontier API costs (Claude, GPT, Gemini, DeepSeek, Grok, Kimi) to show breakeven points.
 
 Key features:
 - **Live frontier pricing** fetched from the [OpenRouter API](https://openrouter.ai/api/v1/models) — no API key required
+- **Built-in pricing snapshot** for offline use and as a fallback when the API is unavailable
 - **HuggingFace model search** for labeling the self-hosted model
 - **Workload-aware blended cost** — accounts for input:output token ratio and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
 - **Single self-hosted cost** — unlike frontier APIs that charge differently per token type, self-hosted infrastructure has one fixed cost regardless of whether tokens are input, cached, or output
@@ -50,9 +51,49 @@ The defaults model an agentic coding workload served by [llm-d](https://github.c
 | Avg ISL | 30,000 tokens | Weka trace dataset |
 | Avg OSL | 2,000 tokens | Weka trace dataset |
 
+## Frontier pricing snapshot
+
+The calculator fetches live prices from OpenRouter on load. The table below is the
+offline fallback baked into `index.html`, refreshed on **2026-10-26**. Prices are
+USD per 1M tokens.
+
+| Model | Input | Cached input | Output |
+|---|---:|---:|---:|
+| Claude Opus 5.5 | $4.00 | $0.20 | $20.00 |
+| Claude Sonnet 5.5 | $2.00 | $0.10 | $10.00 |
+| GPT-6.1 Sol | $2.00 | $0.10 | $10.00 |
+| GPT-6.1 Terra | $1.00 | $0.05 | $5.00 |
+| Gemini 4 Argon | $2.00 | $0.10 | $10.00 |
+| DeepSeek V4.1 Flash 1017 | $0.15 | $0.003 | $0.60 |
+| Grok 4.7 | $2.00 | $0.50 | $6.00 |
+| Kimi K3.1 Pro | $2.00 | $0.20 | $10.00 |
+
+### Refreshing pricing
+
+The repo includes an agent skill and a small Node.js (18+) script for keeping the
+snapshot current:
+
+```sh
+node scripts/refresh-pricing.mjs          # preview
+node scripts/refresh-pricing.mjs --write  # update index.html
+node scripts/refresh-pricing.mjs --check  # fail if the snapshot is stale
+```
+
+The script picks the newest model in each configured family from OpenRouter, so
+version bumps are picked up automatically. See
+`.claude/skills/refresh-frontier-pricing/SKILL.md` for the full workflow and how
+to add or remove a model family.
+
+### Deploying
+
+Pushing to `main` triggers the GitHub Pages workflow in
+`.github/workflows/pages.yml`. See
+`.claude/skills/commit-push-deploy/SKILL.md` for the commit, push, watch, and
+live-site verification workflow.
+
 ## Tech stack
 
-Single HTML file, no build step. Uses Chart.js 4.x from CDN, vanilla JavaScript, and browser `fetch()` for API calls (both OpenRouter and HuggingFace support CORS).
+Single HTML file, no build step. Uses Chart.js 4.x from CDN, vanilla JavaScript, and browser `fetch()` for API calls (both OpenRouter and HuggingFace support CORS). The pricing refresh script is a maintenance tool only; it is not part of the deployed page.
 
 ## License
 

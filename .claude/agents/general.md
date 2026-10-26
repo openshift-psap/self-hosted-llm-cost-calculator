@@ -19,6 +19,8 @@ You work on a self-hosted LLM cost calculator — an interactive single-file HTM
 ```
 index.html                    # The entire app — HTML, CSS, JS
 README.md                     # Documentation and cost methodology
+scripts/refresh-pricing.mjs   # Regenerates the frontend pricing snapshot from OpenRouter
+.claude/skills/               # Agent skills (refresh-frontier-pricing, commit-push-deploy)
 .github/workflows/pages.yml   # GitHub Pages deployment
 .claude/agents/               # Agent definitions
 ```
@@ -29,6 +31,8 @@ README.md                     # Documentation and cost methodology
 - The calculator models agentic coding workloads on GPU clusters (default: 8 × 8xH200 nodes)
 - Cost methodology accounts for prompt cache hit rate and input:output ratio when comparing against frontier APIs
 - Frontier pricing fetched live from OpenRouter API
+- `index.html` also carries a generated `FRONTIER_MODELS` snapshot used as the offline fallback
+- Refresh the snapshot with the `refresh-frontier-pricing` skill or `node scripts/refresh-pricing.mjs --write`
 - Model search via HuggingFace API
 - Both APIs are free, no-auth, CORS-enabled
 

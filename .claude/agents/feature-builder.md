@@ -27,6 +27,7 @@ You implement features for a self-hosted LLM cost calculator — a single-file H
 ## Constraints
 
 - Keep it a single HTML file — no build tools, no npm, no separate JS/CSS files
+- The generated `FRONTIER_MODELS` block in `index.html` is refreshed with `node scripts/refresh-pricing.mjs --write`, not hand-edited (except when documenting a manual fallback)
 - Any new input must be wired into the event listener list at the bottom of the script
 - Any new input that affects cost math must flow through `compute()` and be reflected in `render()`
 - Self-hosted cost is ONE number for all token types — never split by input/output/cached
