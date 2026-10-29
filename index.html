@@ -235,6 +235,12 @@
     border-color: var(--cat-1);
     box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
   }
+  .field-hint {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
 
   .field-row {
     display: grid;
@@ -513,6 +519,7 @@
         <div class="field">
           <label>Uncached prefill goodput (tok/s)</label>
           <input type="number" id="inputTps" value="13000" min="1" step="100">
+          <div class="field-hint">If your benchmark reports total input tok/s (cache hits included), multiply by (1 &minus; cache hit rate) first.</div>
         </div>
       </div>
       <div class="field">
@@ -618,7 +625,7 @@
     { id: 'openai/gpt-6.1-sol', name: 'GPT-6.1 Sol', inputPrice: 2, cachedPrice: 0.1, outputPrice: 10, checked: true },
     { id: 'openai/gpt-6.1-terra', name: 'GPT-6.1 Terra', inputPrice: 1, cachedPrice: 0.05, outputPrice: 5, checked: true },
     { id: 'google/gemini-4-argon', name: 'Gemini 4 Argon', inputPrice: 2, cachedPrice: 0.1, outputPrice: 10, checked: false },
-    { id: 'deepseek/deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash 1017', inputPrice: 0.15, cachedPrice: 0, outputPrice: 0.6, checked: false },
+    { id: 'deepseek/deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash 1017', inputPrice: 0.15, cachedPrice: 0.003, outputPrice: 0.6, checked: false },
     { id: 'x-ai/grok-4.7', name: 'Grok 4.7', inputPrice: 2, cachedPrice: 0.5, outputPrice: 6, checked: false },
     { id: 'moonshotai/kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputPrice: 2, cachedPrice: 0.2, outputPrice: 10, checked: false },
   ];
@@ -700,9 +707,12 @@
       const modelMap = new Map();
       (data.data || data).forEach(m => modelMap.set(m.id, m));
 
-      const price = (value, fallback) => {
+      // Cached input prices can be sub-cent, so they keep 3 decimals; all
+      // other prices round to 2.
+      const price = (value, fallback, decimals = 2) => {
         const n = parseFloat(value);
-        return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * 100) / 100 : fallback;
+        const factor = Math.pow(10, decimals);
+        return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * factor) / factor : fallback;
       };
 
       frontierModels = FRONTIER_MODELS.map((m, i) => {
@@ -713,7 +723,7 @@
           id: m.id,
           name: m.name,
           inputPrice: live ? price(p.prompt, m.inputPrice) : m.inputPrice,
-          cachedPrice: live ? price(p.input_cache_read, m.cachedPrice) : m.cachedPrice,
+          cachedPrice: live ? price(p.input_cache_read, m.cachedPrice, 3) : m.cachedPrice,
           outputPrice: live ? price(p.completion, m.outputPrice) : m.outputPrice,
           checked: DEFAULT_CHECKED.has(m.id),
           color: COLORS[i % COLORS.length],
@@ -752,7 +762,7 @@
           <div class="frontier-name" style="color: ${m.color};">${esc(m.name)}</div>
           <div class="frontier-prices">
             <div><label>Input $/M</label><input type="number" data-idx="${i}" data-field="inputPrice" value="${m.inputPrice}" min="0" step="0.1"></div>
-            <div><label>Cached $/M</label><input type="number" data-idx="${i}" data-field="cachedPrice" value="${m.cachedPrice}" min="0" step="0.01"></div>
+            <div><label>Cached $/M</label><input type="number" data-idx="${i}" data-field="cachedPrice" value="${m.cachedPrice}" min="0" step="0.001"></div>
             <div><label>Output $/M</label><input type="number" data-idx="${i}" data-field="outputPrice" value="${m.outputPrice}" min="0" step="0.5"></div>
           </div>
           <div class="frontier-blended" id="blended-${i}"></div>
@@ -919,7 +929,7 @@
       if (mathEl) {
         mathEl.innerHTML =
           `${(uncachedFrac * 100).toFixed(1)}% &times; $${fmt(m.inputPrice)} + ` +
-          `${(cachedFrac * 100).toFixed(1)}% &times; $${fmt(m.cachedPrice)} + ` +
+          `${(cachedFrac * 100).toFixed(1)}% &times; $${fmt(m.cachedPrice, 3)} + ` +
           `${(outputFrac * 100).toFixed(1)}% &times; $${fmt(m.outputPrice)}` +
           ` (cache: ${cacheHitDisplay}%)`;
       }

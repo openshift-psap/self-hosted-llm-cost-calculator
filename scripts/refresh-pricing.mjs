@@ -45,15 +45,18 @@ function fail(message) {
   process.exit(1);
 }
 
-function perMillion(value) {
+// Cached input prices can be sub-cent, so they keep 3 decimals; all other
+// prices round to 2.
+function perMillion(value, decimals = 2) {
   const n = parseFloat(value);
   if (!Number.isFinite(n) || n < 0) return null;
-  return roundPrice(n * 1e6);
+  return roundPrice(n * 1e6, decimals);
 }
 
-function roundPrice(n) {
+function roundPrice(n, decimals = 2) {
   if (n === 0) return 0;
-  return Number(n.toFixed(2));
+  const factor = Math.pow(10, decimals);
+  return Math.round(n * factor) / factor;
 }
 
 function quote(value) {
@@ -79,7 +82,7 @@ function pickModels(payload) {
 
     const model = candidates[0];
     const inputPrice = perMillion(model.pricing?.prompt);
-    const cachedPrice = perMillion(model.pricing?.input_cache_read) ?? inputPrice;
+    const cachedPrice = perMillion(model.pricing?.input_cache_read, 3) ?? inputPrice;
     const outputPrice = perMillion(model.pricing?.completion);
 
     if (inputPrice === null || cachedPrice === null || outputPrice === null) {
@@ -128,8 +131,8 @@ function normalizeSnapshot(text) {
   return text.replace(/^  \/\/ Snapshot: \d{4}-\d{2}-\d{2}$/m, '  // Snapshot: YYYY-MM-DD');
 }
 
-function formatPrice(n) {
-  return `$${n.toFixed(2)}`;
+function formatPrice(n, decimals = 2) {
+  return `$${n.toFixed(decimals)}`;
 }
 
 async function main() {
@@ -156,7 +159,7 @@ async function main() {
     console.log(
       `  ${m.name.padEnd(26)} ${m.id.padEnd(38)} ` +
       `in ${formatPrice(m.inputPrice).padStart(8)}  ` +
-      `cached ${formatPrice(m.cachedPrice).padStart(8)}  ` +
+      `cached ${formatPrice(m.cachedPrice, 3).padStart(8)}  ` +
       `out ${formatPrice(m.outputPrice).padStart(8)}`
     );
   }

@@ -84,7 +84,8 @@ USD per 1M tokens.
 ### Refreshing pricing
 
 The repo includes an agent skill and a small Node.js (18+) script for keeping the
-snapshot current:
+snapshot current. Cached input prices keep 3 decimals (they can be sub-cent,
+e.g. DeepSeek at $0.003/M); all other prices round to 2:
 
 ```sh
 node scripts/refresh-pricing.mjs          # preview
