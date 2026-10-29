@@ -12,15 +12,22 @@ Key features:
 - **Live frontier pricing** fetched from the [OpenRouter API](https://openrouter.ai/api/v1/models) — no API key required
 - **Built-in pricing snapshot** for offline use and as a fallback when the API is unavailable
 - **HuggingFace model search** for labeling the self-hosted model
-- **Workload-aware blended cost** — accounts for input:output token ratio and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
+- **Workload-aware blended cost** — accounts for the ISL:OSL token mix and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
+- **Two-resource capacity model** — decode and uncached-prefill goodput are separate capacity limits; sustained throughput is whichever the workload mix binds first, so cache hit rate affects servable capacity, not just API billing
 - **Single self-hosted cost** — unlike frontier APIs that charge differently per token type, self-hosted infrastructure has one fixed cost regardless of whether tokens are input, cached, or output
 
 ## Cost methodology
 
 ### Self-hosted cost per million tokens
 
+Decode and uncached prefill are modeled as separate serving resources (as in a disaggregated stack). Cached prefix reads are treated as near-free: the serving engine skips them, so they consume neither prefill nor decode budget. Token fractions come from the workload's ISL:OSL mix and cache hit rate.
+
 ```
-cost/M = Annual TCO / (total_goodput_tps × seconds_per_year / 1e6)
+decode_limit   = output_goodput_tps / output_frac
+prefill_limit  = uncached_prefill_goodput_tps / uncached_input_frac
+sustained_tps  = min(decode_limit, prefill_limit)
+
+cost/M = Annual TCO / (sustained_tps × seconds_per_year / 1e6)
 ```
 
 At utilization U%: `cost/M = cost_at_100% / (U / 100)`
@@ -35,7 +42,7 @@ blended/M = uncached_input_frac × input_price
           + output_frac         × output_price
 ```
 
-Where fractions are derived from the serving goodput ratio and cache hit rate. This matters because agentic workloads with high cache hit rates (e.g., 87% for multi-turn sessions) dramatically reduce the effective frontier cost — a naive comparison using list prices overstates the frontier cost.
+Where fractions are derived from the workload's ISL:OSL token mix and the cache hit rate — matching how frontier APIs bill, since cached input tokens are charged at the (cheaper) cached rate rather than being free. This matters because agentic workloads with high cache hit rates (e.g., 87% for multi-turn sessions) dramatically reduce the effective frontier cost — a naive comparison using list prices overstates the frontier cost.
 
 ## Default parameters
 
@@ -45,11 +52,17 @@ The defaults model an agentic coding workload served by [llm-d](https://github.c
 |---|---|---|
 | GPU nodes | 8 (8xH200 each) | IBM Cloud |
 | Cost/node/month | $11,597.84 | IBM Cloud public pricing |
-| Output goodput | 6,000 tok/s | aiperf benchmark (InferenceX CC-Traces Weka, c=128) |
-| Input goodput | 13,000 tok/s | aiperf benchmark |
+| Output goodput (decode) | 6,000 tok/s | aiperf benchmark (InferenceX CC-Traces Weka, c=128) |
+| Uncached prefill goodput | 13,000 tok/s | aiperf benchmark — server-computed prefill tokens; cached prefix reads excluded |
 | Cache hit rate | 87% | Multi-turn agentic session prefix reuse |
 | Avg ISL | 30,000 tokens | Weka trace dataset |
 | Avg OSL | 2,000 tokens | Weka trace dataset |
+
+> Note: the prefill goodput figure is assumed to count only tokens the serving
+> engine actually computed (cached prefixes skipped). If your benchmark reports
+> input throughput as all input tokens delivered (AIPerf's client-side
+> `total_isl / duration` does), derive the uncached figure first — e.g.
+> `raw_input_tps × (1 − cache_hit_rate)` — before entering it.
 
 ## Frontier pricing snapshot
 

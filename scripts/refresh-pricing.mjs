@@ -53,9 +53,7 @@ function perMillion(value) {
 
 function roundPrice(n) {
   if (n === 0) return 0;
-  const abs = Math.abs(n);
-  const decimals = abs < 0.01 ? 6 : abs < 0.1 ? 5 : abs < 1 ? 4 : 2;
-  return Number(n.toFixed(decimals));
+  return Number(n.toFixed(2));
 }
 
 function quote(value) {
@@ -131,7 +129,7 @@ function normalizeSnapshot(text) {
 }
 
 function formatPrice(n) {
-  return `$${n.toFixed(n < 1 ? 4 : 2).replace(/0+$/, '').replace(/\.$/, '')}`;
+  return `$${n.toFixed(2)}`;
 }
 
 async function main() {

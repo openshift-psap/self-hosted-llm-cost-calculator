@@ -144,7 +144,7 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 440px 1fr;
     height: calc(100vh - 60px);
   }
 
@@ -160,9 +160,9 @@
 
   .sidebar {
     overflow-y: auto;
-    padding: 12px;
+    padding: 14px;
     border-right: 1px solid var(--gridline);
-    background: var(--surface-1);
+    background: var(--page-plane);
   }
 
   .main {
@@ -170,7 +170,7 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
   .panel {
@@ -181,28 +181,37 @@
   }
 
   .sidebar .panel {
-    margin-bottom: 10px;
-    border: none;
-    padding: 0;
+    margin-bottom: 14px;
+    border: 1px solid var(--gridline);
+    border-radius: 6px;
+    padding: 14px;
+    background: var(--surface-1);
+    box-shadow: 0 1px 2px rgba(11,11,11,0.03);
   }
+  .sidebar .panel:last-child { margin-bottom: 0; }
 
   .panel-title {
     font-size: 11px;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--gridline);
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--baseline);
   }
 
   .section-label {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
-    margin: 8px 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin: 14px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px dashed var(--baseline);
   }
+  .section-label:first-of-type { margin-top: 4px; }
 
   .field { margin-bottom: 6px; }
   .field label {
@@ -282,16 +291,6 @@
   }
   .hf-result:hover { background: var(--page-plane); }
   .hf-result .dl { color: var(--text-muted); font-size: 9px; }
-  .selected-model {
-    display: inline-block;
-    background: var(--cat-1);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 1px 8px;
-    border-radius: 10px;
-    margin-top: 3px;
-  }
 
   .frontier-list { list-style: none; }
   .frontier-item {
@@ -343,24 +342,33 @@
     background: var(--surface-1);
     border: 1px solid var(--gridline);
     border-radius: 6px;
-    padding: 12px;
+    padding: 14px;
     flex: 1;
     min-height: 300px;
+    display: flex;
+    flex-direction: column;
+  }
+  .chart-canvas-holder {
+    flex: 1;
+    min-height: 260px;
+    position: relative;
   }
 
   .breakeven-table {
     background: var(--surface-1);
     border: 1px solid var(--gridline);
     border-radius: 6px;
-    padding: 10px;
+    padding: 14px;
   }
   .breakeven-table h3 {
     font-size: 11px;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--baseline);
   }
   .breakeven-table table {
     width: 100%;
@@ -441,7 +449,6 @@
         <input type="text" id="hfSearch" placeholder="Search models..." autocomplete="off">
         <div class="hf-results" id="hfResults"></div>
       </div>
-      <div id="selectedModelWrap"></div>
 
       <div class="section-label">Infrastructure</div>
       <div class="field-row">
@@ -504,13 +511,13 @@
           <input type="number" id="outputTps" value="6000" min="1" step="100">
         </div>
         <div class="field">
-          <label>Input goodput (tok/s)</label>
+          <label>Uncached prefill goodput (tok/s)</label>
           <input type="number" id="inputTps" value="13000" min="1" step="100">
         </div>
       </div>
       <div class="field">
         <label>Output tok/s per user</label>
-        <input type="number" id="outputTpsPerUser" value="32" min="0.1" step="1" style="width: calc(50% - 3px);">
+        <input type="number" id="outputTpsPerUser" value="32" min="0.1" step="1">
       </div>
 
       <div class="section-label">Demand Estimate</div>
@@ -537,7 +544,7 @@
 
       <div class="computed-box">
         <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; Pilot: <span class="val" id="pilotCost">—</span></div>
-        <div>I:O goodput ratio: <span class="val" id="ioRatio">—</span> &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
+        <div>Sustained capacity: <span class="val" id="sustainedTps">—</span> (<span class="val" id="bindingRes">—</span>-bound) &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
           Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
         </div>
@@ -563,7 +570,10 @@
   <!-- MAIN: chart + breakeven -->
   <div class="main">
     <div class="chart-wrap">
-      <canvas id="costChart"></canvas>
+      <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
+      <div class="chart-canvas-holder">
+        <canvas id="costChart"></canvas>
+      </div>
     </div>
 
     <div class="breakeven-table">
@@ -584,7 +594,7 @@
     <p class="footer-note">
       Pricing via <a href="https://openrouter.ai" style="color: var(--cat-1);">OpenRouter</a> (live, with offline snapshot).
       Models via <a href="https://huggingface.co" style="color: var(--cat-1);">HuggingFace</a>.
-      Blended cost accounts for I:O ratio and cache hit rate.
+      Blended cost accounts for the ISL:OSL token mix and cache hit rate.
     </p>
   </div>
 
@@ -608,7 +618,7 @@
     { id: 'openai/gpt-6.1-sol', name: 'GPT-6.1 Sol', inputPrice: 2, cachedPrice: 0.1, outputPrice: 10, checked: true },
     { id: 'openai/gpt-6.1-terra', name: 'GPT-6.1 Terra', inputPrice: 1, cachedPrice: 0.05, outputPrice: 5, checked: true },
     { id: 'google/gemini-4-argon', name: 'Gemini 4 Argon', inputPrice: 2, cachedPrice: 0.1, outputPrice: 10, checked: false },
-    { id: 'deepseek/deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash 1017', inputPrice: 0.15, cachedPrice: 0.003, outputPrice: 0.6, checked: false },
+    { id: 'deepseek/deepseek-v4.1-flash-1017', name: 'DeepSeek V4.1 Flash 1017', inputPrice: 0.15, cachedPrice: 0, outputPrice: 0.6, checked: false },
     { id: 'x-ai/grok-4.7', name: 'Grok 4.7', inputPrice: 2, cachedPrice: 0.5, outputPrice: 6, checked: false },
     { id: 'moonshotai/kimi-k3.1-pro', name: 'Kimi K3.1 Pro', inputPrice: 2, cachedPrice: 0.2, outputPrice: 10, checked: false },
   ];
@@ -666,7 +676,6 @@
           selectedModel = m.id;
           hfInput.value = '';
           hfResults.classList.remove('open');
-          renderSelectedModel();
           render();
         });
         hfResults.appendChild(div);
@@ -683,10 +692,6 @@
     return d.innerHTML;
   }
 
-  function renderSelectedModel() {
-    $('selectedModelWrap').innerHTML = `<span class="selected-model">${esc(selectedModel)}</span>`;
-  }
-
   // --- OpenRouter frontier pricing ---
   async function loadFrontierPricing() {
     try {
@@ -697,7 +702,7 @@
 
       const price = (value, fallback) => {
         const n = parseFloat(value);
-        return Number.isFinite(n) && n >= 0 ? n * 1e6 : fallback;
+        return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * 100) / 100 : fallback;
       };
 
       frontierModels = FRONTIER_MODELS.map((m, i) => {
@@ -790,23 +795,36 @@
     const monthlyCost = numNodes * costPerNode + otherCost;
     const annualTco = monthlyCost * 12;
     const pilotCost = monthlyCost * pilotMonths;
-    const totalTps = outputTps + inputTps;
 
-    const annualTotalTokens = totalTps * SECS_PER_YEAR;
-    const costPerMAt100 = annualTotalTokens > 0 ? annualTco / (annualTotalTokens / 1e6) : 0;
-
-    const inputFrac = totalTps > 0 ? inputTps / totalTps : 0;
-    const outputFrac = totalTps > 0 ? outputTps / totalTps : 0;
+    // Billing mix: providers charge per token delivered (cached input bills at
+    // the cached rate, not $0), so the blend weights come from the workload's
+    // token composition (ISL:OSL) split by cache hit rate.
+    const turnTokens = avgIsl + avgOsl;
+    const inputFrac = turnTokens > 0 ? avgIsl / turnTokens : 0;
+    const outputFrac = turnTokens > 0 ? avgOsl / turnTokens : 0;
     const cachedFrac = inputFrac * cacheHitPct;
     const uncachedFrac = inputFrac * (1 - cacheHitPct);
+
+    // Serving capacity: decode and uncached prefill are separate resources
+    // (as in a disaggregated stack). Cached prefix reads are near-free and are
+    // not counted against prefill capacity. The sustained raw-token capacity
+    // for this workload mix is whichever resource the mix exhausts first.
+    const decodeLimit = outputFrac > 0 ? outputTps / outputFrac : Infinity;
+    const prefillLimit = uncachedFrac > 0 ? inputTps / uncachedFrac : Infinity;
+    const sustainedTps = Math.min(decodeLimit, prefillLimit);
+    const bindingResource = decodeLimit <= prefillLimit ? 'decode' : 'prefill';
+
+    const annualTotalTokens = Number.isFinite(sustainedTps) ? sustainedTps * SECS_PER_YEAR : 0;
+    const costPerMAt100 = annualTotalTokens > 0 ? annualTco / (annualTotalTokens / 1e6) : 0;
 
     // Update computed display
     $('totalGpus').textContent = `${totalGpus}× ${esc(gpuType)}`;
     $('annualTco').textContent = fmtDollar(annualTco);
     $('pilotCost').textContent = fmtDollar(pilotCost);
-    $('ioRatio').textContent = outputTps > 0 ? (inputTps / outputTps).toFixed(2) + ':1' : 'N/A';
+    $('sustainedTps').textContent = Number.isFinite(sustainedTps) ? `${fmt(sustainedTps, 0)} tok/s` : 'N/A';
+    $('bindingRes').textContent = bindingResource;
     $('islOslRatio').textContent = avgOsl > 0 ? (avgIsl / avgOsl).toFixed(1) + ':1' : 'N/A';
-    $('shCostPerM').textContent = '$' + fmt(costPerMAt100, 4);
+    $('shCostPerM').textContent = '$' + fmt(costPerMAt100, 2);
 
     // --- Demand estimate ---
     const numUsers = val('numUsers');
@@ -823,13 +841,13 @@
     const monthlyDemand = numUsers * tokensPerUserMo;
 
     const SECS_PER_MONTH = 30.44 * 86400;
-    const monthlySupply = totalTps * SECS_PER_MONTH;
+    const monthlySupply = Number.isFinite(sustainedTps) ? sustainedTps * SECS_PER_MONTH : 0;
     const derivedUtil = monthlySupply > 0 ? (monthlyDemand / monthlySupply) * 100 : 0;
 
     const avgConcurrent = numUsers * dutyCyclePct;
     const tpsPerUserTotal = timePerTurn > 0 ? tokensPerTurn / timePerTurn : 0;
     const peakTps = avgConcurrent * tpsPerUserTotal;
-    const peakUtil = totalTps > 0 ? (peakTps / totalTps) * 100 : 0;
+    const peakUtil = sustainedTps > 0 && Number.isFinite(sustainedTps) ? (peakTps / sustainedTps) * 100 : 0;
 
     const costAtDerivedUtil = derivedUtil > 0 ? costPerMAt100 / (Math.min(derivedUtil, 100) / 100) : 0;
 
@@ -843,7 +861,7 @@
     const peakWarning = $('peakWarning');
     if (peakUtil > 100) {
       peakWarning.style.display = 'block';
-      peakWarning.textContent = `Peak demand (${fmt(peakTps, 0)} tok/s) exceeds capacity (${fmt(totalTps, 0)} tok/s). ` +
+      peakWarning.textContent = `Peak demand (${fmt(peakTps, 0)} tok/s) exceeds sustained capacity (${fmt(sustainedTps, 0)} tok/s, ${bindingResource}-bound). ` +
         `Per-user throughput will degrade at peak, or add ~${Math.ceil(peakUtil / 100)} nodes.`;
     } else {
       peakWarning.style.display = 'none';
@@ -863,9 +881,11 @@
       `<strong>Cost derivation:</strong><br>` +
       `&bull; Infra: ${numNodes} nodes &times; ${gpusPerNode} ${esc(gpuType)}/node = <strong>${totalGpus} GPUs</strong><br>` +
       `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 + $${fmt(otherCost * 12)} = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
-      `&bull; Goodput = ${fmt(outputTps, 0)} out + ${fmt(inputTps, 0)} in = <strong>${fmt(totalTps, 0)} tok/s</strong><br>` +
-      `&bull; Annual tokens = ${fmt(totalTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
-      `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 4)}/M</strong><br><br>` +
+      `&bull; Decode limit = ${fmt(outputTps, 0)} out tok/s &divide; ${fmt(outputFrac * 100, 2)}% output tokens = <strong>${fmt(decodeLimit, 0)} tok/s</strong><br>` +
+      `&bull; Prefill limit = ${fmt(inputTps, 0)} uncached in tok/s &divide; ${fmt(uncachedFrac * 100, 2)}% uncached input = <strong>${fmt(prefillLimit, 0)} tok/s</strong><br>` +
+      `&bull; Sustained capacity = min of the two = <strong>${fmt(sustainedTps, 0)} tok/s</strong> (${bindingResource}-bound)<br>` +
+      `&bull; Annual tokens = ${fmt(sustainedTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
+      `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 2)}/M</strong><br><br>` +
       `<strong>Utilization derivation:</strong><br>` +
       `&bull; Tokens/turn = ${fmt(avgIsl, 0)} ISL + ${fmt(avgOsl, 0)} OSL = <strong>${fmt(tokensPerTurn, 0)}</strong><br>` +
       `&bull; Time/turn = ${fmt(avgOsl, 0)} OSL &divide; ${fmt(outputPerUser, 0)} tok/s/user = <strong>${fmt(timePerTurn, 1)}s</strong><br>` +
@@ -873,7 +893,7 @@
       `&bull; Eff hours/user/mo = ${fmt(activeHrs, 1)}h &times; ${fmt(dutyCyclePct * 100, 0)}% &times; ${fmt(workDays, 0)}d = <strong>${fmt(effHoursPerUserMo, 1)}h</strong><br>` +
       `&bull; Tokens/user/mo = ${fmt(turnsPerEffHour, 1)} &times; ${fmt(tokensPerTurn, 0)} &times; ${fmt(effHoursPerUserMo, 1)} = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
       `&bull; Monthly demand = ${fmt(numUsers, 0)} users &times; ${(tokensPerUserMo / 1e6).toFixed(1)}M = <strong>${demandB}B tokens</strong><br>` +
-      `&bull; Monthly supply = ${fmt(totalTps, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
+      `&bull; Monthly supply = ${fmt(sustainedTps, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
       `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong><br>` +
       `&bull; Peak concurrent = ${fmt(numUsers, 0)} &times; ${fmt(dutyCyclePct * 100, 0)}% = <strong>${fmt(avgConcurrent, 0)} users</strong> @ ${fmt(peakTps, 0)} tok/s (<strong>${fmt(peakUtil, 1)}%</strong> of capacity)`;
 
@@ -973,7 +993,7 @@
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: {
-            title: { display: true, text: 'Average GPU Utilization (%)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
+            title: { display: true, text: 'Average Utilization (% of sustained capacity)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
             ticks: { stepSize: 10, color: '#898781', font: { size: 10 } },
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },
@@ -982,7 +1002,7 @@
             title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
             min: 0,
             max: maxY,
-            ticks: { color: '#898781', font: { size: 10 }, callback: v => '$' + v },
+            ticks: { color: '#898781', font: { size: 10 }, callback: v => '$' + Number(v.toFixed(2)) },
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },
           },
@@ -1132,7 +1152,6 @@
       : '';
 
     const rows = [
-      ['Model', selectedModel],
       ['GPU Type', gpuType],
       ['GPUs / Node', gpusPerNode],
       ['Nodes', numNodes],
@@ -1146,8 +1165,8 @@
       ['Avg ISL (tokens)', fmt(val('avgIsl'), 0)],
       ['Avg OSL (tokens)', fmt(val('avgOsl'), 0)],
       ['', ''],
-      ['Output Goodput (tok/s)', fmt(val('outputTps'), 0)],
-      ['Input Goodput (tok/s)', fmt(val('inputTps'), 0)],
+      ['Decode Goodput (tok/s)', fmt(val('outputTps'), 0)],
+      ['Uncached Prefill Goodput (tok/s)', fmt(val('inputTps'), 0)],
       ['Output tok/s per User', fmt(val('outputTpsPerUser'), 0)],
       ['', ''],
       ['Number of Users', fmt(val('numUsers'), 0)],
@@ -1157,7 +1176,8 @@
       ['', ''],
       ['Annual TCO', $('annualTco').textContent],
       ['Pilot Cost', $('pilotCost').textContent],
-      ['I:O Goodput Ratio', $('ioRatio').textContent],
+      ['Sustained Capacity', $('sustainedTps').textContent + ' (' + $('bindingRes').textContent + '-bound)'],
+      ['ISL:OSL Ratio', $('islOslRatio').textContent],
       ['Self-Hosted Cost/M (100%)', $('shCostPerM').textContent + '/M tokens'],
       ['Monthly Token Demand', $('monthlyDemand').textContent],
       ['Derived Avg Utilization', $('derivedUtil').textContent],
@@ -1216,7 +1236,6 @@
   $('printNow').addEventListener('click', () => window.print());
 
   // --- Init ---
-  renderSelectedModel();
   loadFrontierPricing();
 
 })();
