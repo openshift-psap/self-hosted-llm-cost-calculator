@@ -16,6 +16,7 @@ git status --short
 git diff
 git diff --check
 node scripts/refresh-pricing.mjs --check   # pricing snapshot must not be stale
+node scripts/refresh-presets.mjs --check   # scenario preset snapshot must not be stale
 ```
 
 If `index.html` changed, also check the inline JavaScript:

@@ -235,12 +235,6 @@
     border-color: var(--cat-1);
     box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
   }
-  .field-hint {
-    font-size: 9px;
-    color: var(--text-muted);
-    line-height: 1.4;
-    margin-top: 2px;
-  }
 
   .field-row {
     display: grid;
@@ -258,6 +252,58 @@
     color: var(--text-secondary);
   }
   .computed-box .val { font-weight: 700; color: var(--text-primary); }
+
+  .preset-quick {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .preset-quick button {
+    padding: 6px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    line-height: 1.3;
+    color: var(--text-secondary);
+    background: var(--page-plane);
+    border: 1px solid var(--baseline);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .preset-quick button:hover { border-color: var(--cat-1); color: var(--cat-1); }
+  .preset-quick button.active {
+    background: var(--cat-1);
+    border-color: var(--cat-1);
+    color: #fff;
+  }
+  .preset-select {
+    width: 100%;
+    padding: 5px 6px;
+    border: 1px solid var(--baseline);
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .preset-select:focus {
+    outline: none;
+    border-color: var(--cat-1);
+    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
+  }
+  .preset-provenance {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 6px;
+    display: none;
+  }
+  .preset-provenance.open { display: block; }
+  .preset-provenance a { color: var(--cat-1); }
+  .preset-provenance .src { color: var(--text-secondary); font-weight: 600; }
 
   .math-toggle {
     font-size: 10px;
@@ -448,6 +494,15 @@
   <div class="sidebar">
 
     <div class="panel">
+      <div class="panel-title">Scenario Preset</div>
+      <div class="preset-quick" id="presetQuick"></div>
+      <select id="presetSelect" class="preset-select" aria-label="Scenario preset">
+        <option value="custom">Custom — use current values</option>
+      </select>
+      <div class="preset-provenance" id="presetProvenance"></div>
+    </div>
+
+    <div class="panel">
       <div class="panel-title">Self-Hosted Model</div>
 
       <div class="field hf-search-wrap">
@@ -464,7 +519,7 @@
         </div>
         <div class="field">
           <label>GPUs per node</label>
-          <input type="number" id="gpusPerNode" value="8" min="1" max="16" step="1">
+          <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
         </div>
       </div>
       <div class="field-row">
@@ -475,16 +530,6 @@
         <div class="field">
           <label>$/node/month</label>
           <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Other $/month</label>
-          <input type="number" id="otherCost" value="900" min="0" step="100">
-        </div>
-        <div class="field">
-          <label>Pilot months</label>
-          <input type="number" id="pilotMonths" value="6" min="1" max="60" step="1">
         </div>
       </div>
 
@@ -517,9 +562,8 @@
           <input type="number" id="outputTps" value="6000" min="1" step="100">
         </div>
         <div class="field">
-          <label>Uncached prefill goodput (tok/s)</label>
-          <input type="number" id="inputTps" value="13000" min="1" step="100">
-          <div class="field-hint">If your benchmark reports total input tok/s (cache hits included), multiply by (1 &minus; cache hit rate) first.</div>
+          <label>Prefill goodput (tok/s, incl. cached)</label>
+          <input type="number" id="inputTps" value="100000" min="1" step="100">
         </div>
       </div>
       <div class="field">
@@ -550,7 +594,7 @@
       </div>
 
       <div class="computed-box">
-        <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; Pilot: <span class="val" id="pilotCost">—</span></div>
+        <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span></div>
         <div>Sustained capacity: <span class="val" id="sustainedTps">—</span> (<span class="val" id="bindingRes">—</span>-bound) &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
           Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
@@ -558,8 +602,6 @@
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
           <div>Monthly token demand: <span class="val" id="monthlyDemand">—</span></div>
           <div>Avg utilization: <span class="val" id="derivedUtil" style="font-size: 13px;">—</span> &nbsp; Self-hosted cost: <span class="val" id="shCostAtUtil" style="font-size: 13px;">—</span>/M</div>
-          <div>Peak-hour utilization: <span class="val" id="peakUtil">—</span></div>
-          <div id="peakWarning" style="display:none; font-size:10px; color:#e34948; margin-top:2px;"></div>
         </div>
         <div class="math-toggle" id="mathToggle">Show derivation</div>
         <div class="math-detail" id="mathExplanation"></div>
@@ -601,6 +643,7 @@
     <p class="footer-note">
       Pricing via <a href="https://openrouter.ai" style="color: var(--cat-1);">OpenRouter</a> (live, with offline snapshot).
       Models via <a href="https://huggingface.co" style="color: var(--cat-1);">HuggingFace</a>.
+      Presets via <a href="https://inferencex.semianalysis.com" style="color: var(--cat-1);">InferenceX</a> benchmarks.
       Blended cost accounts for the ISL:OSL token mix and cache hit rate.
     </p>
   </div>
@@ -631,6 +674,52 @@
   ];
   // END FRONTIER_PRICING
 
+  // BEGIN SCENARIO_PRESETS
+  // Snapshot: 2026-10-30
+  // Generated by scripts/refresh-presets.mjs from https://inferencex.semianalysis.com.
+  // Each preset is a measured agentic-traces operating point from a single InferenceX
+  // benchmark run on a vLLM-family stack (latest date, best throughput meeting an
+  // interactivity floor). Demand-estimate inputs are left at the repo defaults.
+  const SCENARIO_PRESETS = [
+    { id: 'deepseek-v4-1-flash-h200', label: 'DeepSeek-V4.1-Flash · H200', short: 'DeepSeek-V4.1-Flash H200', featured: true,
+      source: { model: 'DeepSeek-V4.1-Flash', hardware: 'h200', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 128, date: '2026-10-24', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39960029311/attempts/1', gpuHourRate: 2.9 },
+      values: { gpuType: 'H200', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 128, cacheHitRate: 91, avgIsl: 105434, avgOsl: 949, inputTps: 267977, outputTps: 2412, outputTpsPerUser: 21.2 } },
+    { id: 'deepseek-v4-pro-mi355x', label: 'DeepSeek-V4-Pro · MI355X', short: 'DeepSeek-V4-Pro MI355X', featured: true,
+      source: { model: 'DeepSeek-V4-Pro', hardware: 'mi355x', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 64, date: '2026-10-29', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40260921924/attempts/3', gpuHourRate: 2.9 },
+      values: { gpuType: 'MI355X', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 64, cacheHitRate: 92.9, avgIsl: 116247, avgOsl: 958, inputTps: 161093, outputTps: 1328, outputTpsPerUser: 28.9 } },
+    { id: 'deepseek-v4-pro-b300', label: 'DeepSeek-V4-Pro · B300', short: 'DeepSeek-V4-Pro B300', featured: true,
+      source: { model: 'DeepSeek-V4-Pro', hardware: 'b300', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 288, date: '2026-09-28', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/36377107106/attempts/1', gpuHourRate: 4.25 },
+      values: { gpuType: 'B300', gpusPerNode: 8, numNodes: 1, costPerNode: 24820, concurrency: 288, cacheHitRate: 93.1, avgIsl: 126241, avgOsl: 946, inputTps: 705260, outputTps: 5287, outputTpsPerUser: 39 } },
+    { id: 'deepseek-v4-pro-gb300', label: 'DeepSeek-V4-Pro · GB300 NVL72', short: 'DeepSeek-V4-Pro GB300', featured: false,
+      source: { model: 'DeepSeek-V4-Pro', hardware: 'gb300', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 1152, date: '2026-10-14', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/38198902881/attempts/1', gpuHourRate: 5 },
+      values: { gpuType: 'GB300 NVL72', gpusPerNode: 28, numNodes: 1, costPerNode: 102200, concurrency: 1152, cacheHitRate: 8.1, avgIsl: 130618, avgOsl: 982, inputTps: 4353045, outputTps: 32715, outputTpsPerUser: 61.2 } },
+    { id: 'deepseek-v4-pro-b200', label: 'DeepSeek-V4-Pro · B200', short: 'DeepSeek-V4-Pro B200', featured: false,
+      source: { model: 'DeepSeek-V4-Pro', hardware: 'b200', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 160, date: '2026-10-29', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40585790288/attempts/1', gpuHourRate: 3.7 },
+      values: { gpuType: 'B200', gpusPerNode: 8, numNodes: 1, costPerNode: 21608, concurrency: 160, cacheHitRate: 83.5, avgIsl: 127081, avgOsl: 986, inputTps: 539268, outputTps: 4184, outputTpsPerUser: 64.7 } },
+    { id: 'deepseek-v4-pro-gb200', label: 'DeepSeek-V4-Pro · GB200 NVL72', short: 'DeepSeek-V4-Pro GB200', featured: false,
+      source: { model: 'DeepSeek-V4-Pro', hardware: 'gb200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 512, date: '2026-10-14', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/36425419107/attempts/3', gpuHourRate: 4 },
+      values: { gpuType: 'GB200 NVL72', gpusPerNode: 28, numNodes: 1, costPerNode: 81760, concurrency: 512, cacheHitRate: 24.4, avgIsl: 134263, avgOsl: 1019, inputTps: 2366686, outputTps: 17959, outputTpsPerUser: 100.9 } },
+    { id: 'deepseek-v4-1-flash-mi355x', label: 'DeepSeek-V4.1-Flash · MI355X', short: 'DeepSeek-V4.1-Flash MI355X', featured: false,
+      source: { model: 'DeepSeek-V4.1-Flash', hardware: 'mi355x', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 64, date: '2026-10-27', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40161856449/attempts/3', gpuHourRate: 2.9 },
+      values: { gpuType: 'MI355X', gpusPerNode: 2, numNodes: 1, costPerNode: 4234, concurrency: 64, cacheHitRate: 95.2, avgIsl: 135278, avgOsl: 988, inputTps: 369859, outputTps: 2701, outputTpsPerUser: 96.8 } },
+    { id: 'kimi-k3-mi355x', label: 'Kimi-K3 · MI355X', short: 'Kimi-K3 MI355X', featured: false,
+      source: { model: 'Kimi-K3', hardware: 'mi355x', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 60, date: '2026-10-27', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40132624130/attempts/2', gpuHourRate: 2.9 },
+      values: { gpuType: 'MI355X', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 60, cacheHitRate: 50.9, avgIsl: 119193, avgOsl: 892, inputTps: 120429, outputTps: 901, outputTpsPerUser: 20.9 } },
+    { id: 'kimi-k3-tpuv7', label: 'Kimi-K3 · TPU7x', short: 'Kimi-K3 TPU7x', featured: false,
+      source: { model: 'Kimi-K3', hardware: 'tpuv7', framework: 'vllm', precision: 'fp4', disagg: true, concurrency: 72, date: '2026-10-17', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/38997727079/attempts/1', gpuHourRate: 2 },
+      values: { gpuType: 'TPU7x', gpusPerNode: 8, numNodes: 4, costPerNode: 11680, concurrency: 72, cacheHitRate: 60.7, avgIsl: 114990, avgOsl: 937, inputTps: 208460, outputTps: 1699, outputTpsPerUser: 30.8 } },
+    { id: 'kimi-k3-vr200', label: 'Kimi-K3 · Vera Rubin NVL72', short: 'Kimi-K3 Vera Rubin', featured: false,
+      source: { model: 'Kimi-K3', hardware: 'vr200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 256, date: '2026-10-23', runUrl: 'https://github.com/NVIDIA/nv-perf-sa-review/actions/runs/40034981619/attempts/4', gpuHourRate: 8.5 },
+      values: { gpuType: 'Vera Rubin NVL72', gpusPerNode: 8, numNodes: 4, costPerNode: 49640, concurrency: 256, cacheHitRate: 69.1, avgIsl: 142557, avgOsl: 1003, inputTps: 1422155, outputTps: 10007, outputTpsPerUser: 121.4 } },
+    { id: 'minimax-m3-1-flash-gb200', label: 'MiniMax-M3.1-Flash · GB200 NVL72', short: 'MiniMax-M3.1-Flash GB200', featured: false,
+      source: { model: 'MiniMax-M3.1-Flash', hardware: 'gb200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 352, date: '2026-10-29', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40636603138/attempts/1', gpuHourRate: 4 },
+      values: { gpuType: 'GB200 NVL72', gpusPerNode: 32, numNodes: 1, costPerNode: 93440, concurrency: 352, cacheHitRate: 60.2, avgIsl: 143095, avgOsl: 1034, inputTps: 2227920, outputTps: 16099, outputTpsPerUser: 288.2 } },
+    { id: 'minimax-m3-1-flash-h200', label: 'MiniMax-M3.1-Flash · H200', short: 'MiniMax-M3.1-Flash H200', featured: false,
+      source: { model: 'MiniMax-M3.1-Flash', hardware: 'h200', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 20, date: '2026-10-23', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39903574233/attempts/2', gpuHourRate: 2.9 },
+      values: { gpuType: 'H200', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 20, cacheHitRate: 83.3, avgIsl: 129091, avgOsl: 968, inputTps: 82152, outputTps: 616, outputTpsPerUser: 99 } },
+  ];
+  // END SCENARIO_PRESETS
+
   const DEFAULT_CHECKED = new Set(FRONTIER_MODELS.filter(m => m.checked).map(m => m.id));
 
   const $ = id => document.getElementById(id);
@@ -649,6 +738,74 @@
     detail.classList.toggle('open');
     $('mathToggle').textContent = detail.classList.contains('open') ? 'Hide derivation' : 'Show derivation';
   });
+
+  // --- Scenario presets ---
+  const presetSelect = $('presetSelect');
+  const presetQuick = $('presetQuick');
+  const presetProvenance = $('presetProvenance');
+
+  function applyPreset(preset) {
+    const v = preset.values;
+    $('gpuType').value = v.gpuType;
+    $('gpusPerNode').value = v.gpusPerNode;
+    $('numNodes').value = v.numNodes;
+    $('costPerNode').value = v.costPerNode;
+    $('concurrency').value = v.concurrency;
+    $('cacheHitRate').value = v.cacheHitRate;
+    $('avgIsl').value = v.avgIsl;
+    $('avgOsl').value = v.avgOsl;
+    $('inputTps').value = v.inputTps;
+    $('outputTps').value = v.outputTps;
+    $('outputTpsPerUser').value = v.outputTpsPerUser;
+    selectedModel = preset.source.model;
+    $('hfSearch').value = preset.source.model;
+    $('scenarioName').value = preset.label;
+    render();
+    const s = preset.source;
+    presetProvenance.innerHTML =
+      `<span class="src">${esc(s.framework)}, ${esc(s.precision)}${s.disagg ? ', disagg' : ''} &middot; c=${s.concurrency} &middot; ${esc(s.date)}</span><br>` +
+      `Node cost = $${s.gpuHourRate}/GPU-hr rental &times; 730 h &times; ${v.gpusPerNode} GPUs ` +
+      `(<a href="https://inferencex.semianalysis.com/chips" target="_blank" rel="noopener">InferenceX chip pricing</a>).<br>` +
+      `Measured agentic-traces run via <a href="${esc(s.runUrl)}" target="_blank" rel="noopener">InferenceX</a>.`;
+    presetProvenance.classList.add('open');
+  }
+
+  function setActiveQuickButton(btn) {
+    presetQuick.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  }
+
+  function initPresets() {
+    SCENARIO_PRESETS.forEach((p, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = p.label;
+      presetSelect.appendChild(opt);
+    });
+
+    SCENARIO_PRESETS.filter(p => p.featured).slice(0, 3).forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.presetId = p.id;
+      btn.innerHTML = esc(p.short || p.label);
+      btn.addEventListener('click', () => {
+        presetSelect.value = String(SCENARIO_PRESETS.indexOf(p));
+        applyPreset(p);
+        setActiveQuickButton(btn);
+      });
+      presetQuick.appendChild(btn);
+    });
+
+    presetSelect.addEventListener('change', () => {
+      if (presetSelect.value === 'custom') {
+        setActiveQuickButton(null);
+        presetProvenance.classList.remove('open');
+        return;
+      }
+      const p = SCENARIO_PRESETS[+presetSelect.value];
+      applyPreset(p);
+      setActiveQuickButton(presetQuick.querySelector(`[data-preset-id="${p.id}"]`));
+    });
+  }
 
   // --- HuggingFace model search ---
   const hfInput = $('hfSearch');
@@ -793,8 +950,6 @@
     const gpusPerNode = val('gpusPerNode');
     const numNodes = val('numNodes');
     const costPerNode = val('costPerNode');
-    const otherCost = val('otherCost');
-    const pilotMonths = val('pilotMonths');
     const outputTps = val('outputTps');
     const inputTps = val('inputTps');
     const cacheHitPct = val('cacheHitRate') / 100;
@@ -802,9 +957,8 @@
     const avgOsl = val('avgOsl');
 
     const totalGpus = numNodes * gpusPerNode;
-    const monthlyCost = numNodes * costPerNode + otherCost;
+    const monthlyCost = numNodes * costPerNode;
     const annualTco = monthlyCost * 12;
-    const pilotCost = monthlyCost * pilotMonths;
 
     // Billing mix: providers charge per token delivered (cached input bills at
     // the cached rate, not $0), so the blend weights come from the workload's
@@ -815,12 +969,15 @@
     const cachedFrac = inputFrac * cacheHitPct;
     const uncachedFrac = inputFrac * (1 - cacheHitPct);
 
-    // Serving capacity: decode and uncached prefill are separate resources
-    // (as in a disaggregated stack). Cached prefix reads are near-free and are
-    // not counted against prefill capacity. The sustained raw-token capacity
-    // for this workload mix is whichever resource the mix exhausts first.
+    // Serving capacity: decode and prefill are separate resources (as in a
+    // disaggregated stack). The prefill input is the raw figure benchmarks
+    // report — all input tokens, cache hits included — so the prefill
+    // resource caps total token flow at raw prefill ÷ input fraction.
+    // (Equivalently: uncached capacity = raw × (1 − hit rate) measured
+    // against the uncached fraction; the hit rate cancels.) Cache hit rate
+    // affects only the frontier billing blend, not self-hosted capacity.
     const decodeLimit = outputFrac > 0 ? outputTps / outputFrac : Infinity;
-    const prefillLimit = uncachedFrac > 0 ? inputTps / uncachedFrac : Infinity;
+    const prefillLimit = inputFrac > 0 ? inputTps / inputFrac : Infinity;
     const sustainedTps = Math.min(decodeLimit, prefillLimit);
     const bindingResource = decodeLimit <= prefillLimit ? 'decode' : 'prefill';
 
@@ -830,7 +987,6 @@
     // Update computed display
     $('totalGpus').textContent = `${totalGpus}× ${esc(gpuType)}`;
     $('annualTco').textContent = fmtDollar(annualTco);
-    $('pilotCost').textContent = fmtDollar(pilotCost);
     $('sustainedTps').textContent = Number.isFinite(sustainedTps) ? `${fmt(sustainedTps, 0)} tok/s` : 'N/A';
     $('bindingRes').textContent = bindingResource;
     $('islOslRatio').textContent = avgOsl > 0 ? (avgIsl / avgOsl).toFixed(1) + ':1' : 'N/A';
@@ -854,11 +1010,6 @@
     const monthlySupply = Number.isFinite(sustainedTps) ? sustainedTps * SECS_PER_MONTH : 0;
     const derivedUtil = monthlySupply > 0 ? (monthlyDemand / monthlySupply) * 100 : 0;
 
-    const avgConcurrent = numUsers * dutyCyclePct;
-    const tpsPerUserTotal = timePerTurn > 0 ? tokensPerTurn / timePerTurn : 0;
-    const peakTps = avgConcurrent * tpsPerUserTotal;
-    const peakUtil = sustainedTps > 0 && Number.isFinite(sustainedTps) ? (peakTps / sustainedTps) * 100 : 0;
-
     const costAtDerivedUtil = derivedUtil > 0 ? costPerMAt100 / (Math.min(derivedUtil, 100) / 100) : 0;
 
     // Update demand display
@@ -866,16 +1017,6 @@
     $('monthlyDemand').textContent = `${demandB}B tokens/month`;
     $('derivedUtil').textContent = fmt(derivedUtil, 1) + '%';
     $('shCostAtUtil').textContent = '$' + fmt(derivedUtil > 100 ? costPerMAt100 : costAtDerivedUtil, 2);
-    $('peakUtil').textContent = fmt(peakUtil, 1) + '%';
-
-    const peakWarning = $('peakWarning');
-    if (peakUtil > 100) {
-      peakWarning.style.display = 'block';
-      peakWarning.textContent = `Peak demand (${fmt(peakTps, 0)} tok/s) exceeds sustained capacity (${fmt(sustainedTps, 0)} tok/s, ${bindingResource}-bound). ` +
-        `Per-user throughput will degrade at peak, or add ~${Math.ceil(peakUtil / 100)} nodes.`;
-    } else {
-      peakWarning.style.display = 'none';
-    }
 
     if (derivedUtil > 100) {
       $('derivedUtil').style.color = '#e34948';
@@ -890,9 +1031,9 @@
       `uses the same fixed GPU pool.<br><br>` +
       `<strong>Cost derivation:</strong><br>` +
       `&bull; Infra: ${numNodes} nodes &times; ${gpusPerNode} ${esc(gpuType)}/node = <strong>${totalGpus} GPUs</strong><br>` +
-      `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 + $${fmt(otherCost * 12)} = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
+      `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
       `&bull; Decode limit = ${fmt(outputTps, 0)} out tok/s &divide; ${fmt(outputFrac * 100, 2)}% output tokens = <strong>${fmt(decodeLimit, 0)} tok/s</strong><br>` +
-      `&bull; Prefill limit = ${fmt(inputTps, 0)} uncached in tok/s &divide; ${fmt(uncachedFrac * 100, 2)}% uncached input = <strong>${fmt(prefillLimit, 0)} tok/s</strong><br>` +
+      `&bull; Prefill limit = ${fmt(inputTps, 0)} prefill tok/s (incl. cached) &divide; ${fmt(inputFrac * 100, 2)}% input tokens = <strong>${fmt(prefillLimit, 0)} tok/s</strong><br>` +
       `&bull; Sustained capacity = min of the two = <strong>${fmt(sustainedTps, 0)} tok/s</strong> (${bindingResource}-bound)<br>` +
       `&bull; Annual tokens = ${fmt(sustainedTps, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
       `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 2)}/M</strong><br><br>` +
@@ -904,8 +1045,7 @@
       `&bull; Tokens/user/mo = ${fmt(turnsPerEffHour, 1)} &times; ${fmt(tokensPerTurn, 0)} &times; ${fmt(effHoursPerUserMo, 1)} = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
       `&bull; Monthly demand = ${fmt(numUsers, 0)} users &times; ${(tokensPerUserMo / 1e6).toFixed(1)}M = <strong>${demandB}B tokens</strong><br>` +
       `&bull; Monthly supply = ${fmt(sustainedTps, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
-      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong><br>` +
-      `&bull; Peak concurrent = ${fmt(numUsers, 0)} &times; ${fmt(dutyCyclePct * 100, 0)}% = <strong>${fmt(avgConcurrent, 0)} users</strong> @ ${fmt(peakTps, 0)} tok/s (<strong>${fmt(peakUtil, 1)}%</strong> of capacity)`;
+      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong>`;
 
     // Self-hosted curve
     const utilizations = [];
@@ -957,10 +1097,12 @@
     const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens, derivedUtil } = compute();
 
     const maxFrontier = Math.max(...frontierResults.map(f => f.blended), 0);
-    const maxY = Math.min(
-      Math.max(selfHostedCosts[4] || 30, maxFrontier * 1.2, 10),
-      100
-    );
+    // Auto-scale the y-axis to the self-hosted model under consideration:
+    // fit its full cost curve (the max is the cost at the lowest plotted
+    // utilization) plus the frontier lines, rather than a fixed window that
+    // squashes cheap fleets into the bottom of the axis.
+    const curveMax = selfHostedCosts[0] || 0;
+    const maxY = Math.max(curveMax * 1.05, maxFrontier * 1.2) || 1;
 
     const datasets = [
       {
@@ -1141,7 +1283,7 @@
   }
 
   // --- Wire up inputs ---
-  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #otherCost, #pilotMonths, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser, #numUsers, #activeHrs, #dutyCycle, #workDays').forEach(inp => {
+  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #outputTps, #inputTps, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #outputTpsPerUser, #numUsers, #activeHrs, #dutyCycle, #workDays').forEach(inp => {
     inp.addEventListener('input', render);
   });
 
@@ -1167,8 +1309,6 @@
       ['Nodes', numNodes],
       ['Total GPUs', totalGpus + '× ' + gpuType],
       ['$ / Node / Month', '$' + fmt(val('costPerNode'))],
-      ['Other $ / Month', '$' + fmt(val('otherCost'))],
-      ['Pilot Months', val('pilotMonths')],
       ['', ''],
       ['Concurrency (sessions)', val('concurrency')],
       ['Cache Hit Rate', val('cacheHitRate') + '%'],
@@ -1176,7 +1316,7 @@
       ['Avg OSL (tokens)', fmt(val('avgOsl'), 0)],
       ['', ''],
       ['Decode Goodput (tok/s)', fmt(val('outputTps'), 0)],
-      ['Uncached Prefill Goodput (tok/s)', fmt(val('inputTps'), 0)],
+      ['Prefill Goodput (tok/s, incl. cached)', fmt(val('inputTps'), 0)],
       ['Output tok/s per User', fmt(val('outputTpsPerUser'), 0)],
       ['', ''],
       ['Number of Users', fmt(val('numUsers'), 0)],
@@ -1185,14 +1325,12 @@
       ['Working Days / Month', val('workDays')],
       ['', ''],
       ['Annual TCO', $('annualTco').textContent],
-      ['Pilot Cost', $('pilotCost').textContent],
       ['Sustained Capacity', $('sustainedTps').textContent + ' (' + $('bindingRes').textContent + '-bound)'],
       ['ISL:OSL Ratio', $('islOslRatio').textContent],
       ['Self-Hosted Cost/M (100%)', $('shCostPerM').textContent + '/M tokens'],
       ['Monthly Token Demand', $('monthlyDemand').textContent],
       ['Derived Avg Utilization', $('derivedUtil').textContent],
       ['Self-Hosted Cost at Util.', $('shCostAtUtil').textContent + '/M tokens'],
-      ['Peak-Hour Utilization', $('peakUtil').textContent],
     ];
 
     const paramHtml = rows.map(([k, v]) => {
@@ -1246,6 +1384,7 @@
   $('printNow').addEventListener('click', () => window.print());
 
   // --- Init ---
+  initPresets();
   loadFrontierPricing();
 
 })();
