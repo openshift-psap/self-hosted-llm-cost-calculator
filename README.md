@@ -68,9 +68,11 @@ The defaults model an agentic coding workload served by [llm-d](https://github.c
 ## Scenario presets
 
 The sidebar offers preset scenarios built from measured [InferenceX](https://inferencex.semianalysis.com)
-agentic-traces benchmark runs on **vLLM-family serving stacks** (vLLM, Dynamo
-vLLM, llm-d vLLM, MoRI vLLM) — real single runs with full provenance. Three
-featured presets have quick-select buttons; the dropdown lists the full catalog.
+agentic-traces benchmark runs on vLLM- and SGLang-family serving stacks — real
+single runs with full provenance. Preset names carry the workload shape
+(ISL:OSL mix and measured cache hit rate); the serving framework is not shown
+in the UI (it remains in the baked data and the linked run). Three featured
+presets have quick-select buttons; the dropdown lists the full catalog.
 
 Each preset fills the infrastructure, workload-shape, and serving-performance
 fields from one benchmark run:
@@ -106,10 +108,10 @@ node scripts/refresh-presets.mjs --write  # update index.html
 node scripts/refresh-presets.mjs --check  # fail if the snapshot is stale
 ```
 
-The script picks, per curated model × hardware pair, the latest vLLM-family
-run with the highest output throughput among runs meeting a 20 tok/s
-interactivity floor. Edit the `CURATED` list in the script to change the
-catalog.
+The script picks, per curated model × hardware pair, the latest vLLM- or
+SGLang-family run with the highest output throughput among runs meeting a
+20 tok/s interactivity floor. Edit the `CURATED` list in the script to change
+the catalog.
 
 ## Frontier pricing snapshot
 
