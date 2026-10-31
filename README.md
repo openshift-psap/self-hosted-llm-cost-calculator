@@ -6,7 +6,7 @@ Interactive tool for comparing the economics of self-hosted open-weight model in
 
 ## What it does
 
-Calculates the blended cost per million tokens for a self-hosted GPU deployment across 1–100% utilization, and plots it against frontier API costs (Claude, GPT, Gemini, DeepSeek, Grok, Kimi) to show breakeven points.
+Calculates the blended cost per million tokens for a self-hosted GPU deployment across 1–100% utilization, and plots it against closed frontier API costs (Claude, GPT, Gemini, Grok, Amazon Nova, Cohere) to show breakeven points.
 
 Key features:
 - **Live frontier pricing** fetched from the [OpenRouter API](https://openrouter.ai/api/v1/models) — no API key required
@@ -116,25 +116,31 @@ the catalog.
 ## Frontier pricing snapshot
 
 The calculator fetches live prices from OpenRouter on load. The table below is the
-offline fallback baked into `index.html`, refreshed on **2026-10-26**. Prices are
-USD per 1M tokens.
+offline fallback baked into `index.html`, refreshed on **2026-10-31**. Prices are
+USD per 1M tokens. Only closed frontier APIs are listed — open-weight models
+(DeepSeek, Kimi, GLM, Qwen, ...) are excluded from the comparison, since
+self-hosting them is exactly what this calculator evaluates.
 
 | Model | Input | Cached input | Output |
 |---|---:|---:|---:|
 | Claude Opus 5.5 | $4.00 | $0.20 | $20.00 |
 | Claude Sonnet 5.5 | $2.00 | $0.10 | $10.00 |
+| Claude Fable 5.1 | $10.00 | $0.25 | $50.00 |
+| Claude Haiku 5.5 | $0.10 | $0.01 | $0.50 |
 | GPT-6.1 Sol | $2.00 | $0.10 | $10.00 |
 | GPT-6.1 Terra | $1.00 | $0.05 | $5.00 |
+| GPT-6.1 Sol Pro | $2.00 | $0.10 | $10.00 |
 | Gemini 4 Argon | $2.00 | $0.10 | $10.00 |
-| DeepSeek V4.1 Flash 1017 | $0.15 | $0.003 | $0.60 |
+| Gemini 3.8 Flash | $0.83 | $0.08 | $4.13 |
 | Grok 4.7 | $2.00 | $0.50 | $6.00 |
-| Kimi K3.1 Pro | $2.00 | $0.20 | $10.00 |
+| Nova Premier 1.0 | $2.50 | $0.63 | $12.50 |
+| Command A+ | $0.30 | $0.15 | $1.50 |
 
 ### Refreshing pricing
 
 The repo includes an agent skill and a small Node.js (18+) script for keeping the
-snapshot current. Cached input prices keep 3 decimals (they can be sub-cent,
-e.g. DeepSeek at $0.003/M); all other prices round to 2:
+snapshot current. Cached input prices keep 3 decimals (they can be sub-cent);
+all other prices round to 2:
 
 ```sh
 node scripts/refresh-pricing.mjs          # preview

@@ -32,12 +32,16 @@ const END_MARKER = '  // END FRONTIER_PRICING';
 const FAMILIES = [
   { label: 'Anthropic Claude Opus', pattern: /^anthropic\/claude-opus-[\d.]+$/, checked: true },
   { label: 'Anthropic Claude Sonnet', pattern: /^anthropic\/claude-sonnet-[\d.]+$/, checked: true },
+  { label: 'Anthropic Claude Fable', pattern: /^anthropic\/claude-fable-[\d.]+$/, checked: true },
+  { label: 'Anthropic Claude Haiku', pattern: /^anthropic\/claude-haiku-[\d.]+$/, checked: false },
   { label: 'OpenAI GPT Sol', pattern: /^openai\/gpt-[\d.]+-sol$/, checked: true },
   { label: 'OpenAI GPT Terra', pattern: /^openai\/gpt-[\d.]+-terra$/, checked: true },
+  { label: 'OpenAI GPT Sol Pro', pattern: /^openai\/gpt-[\d.]+-sol-pro$/, checked: false },
   { label: 'Google Gemini Argon', pattern: /^google\/gemini-[\d.]+-argon$/, checked: false },
-  { label: 'DeepSeek Flash', pattern: /^deepseek\/deepseek-v[\d.]+-flash(?:-\d+)?$/, checked: false },
+  { label: 'Google Gemini Flash', pattern: /^google\/gemini-[\d.]+-flash$/, checked: false },
   { label: 'xAI Grok', pattern: /^x-ai\/grok-[\d.]+$/, checked: false },
-  { label: 'Moonshot Kimi Pro', pattern: /^moonshotai\/kimi-k[\d.]+-pro$/, checked: false },
+  { label: 'Amazon Nova Premier', pattern: /^amazon\/nova-premier-v[\d.]+$/, checked: false },
+  { label: 'Cohere Command A Plus', pattern: /^cohere\/command-a-plus$/, checked: false },
 ];
 
 function fail(message) {
