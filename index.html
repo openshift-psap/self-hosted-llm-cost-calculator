@@ -31,6 +31,8 @@
   html, body { height: 100%; overflow: hidden; }
 
   body {
+    display: flex;
+    flex-direction: column;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     background: var(--page-plane);
     color: var(--text-primary);
@@ -38,6 +40,7 @@
   }
 
   .top-bar {
+    flex: none;
     padding: 12px 20px 8px;
     border-bottom: 1px solid var(--gridline);
     background: var(--surface-1);
@@ -45,6 +48,8 @@
     align-items: center;
     justify-content: space-between;
   }
+  .top-bar > div { flex: 1; min-width: 0; }
+  .top-bar .btn-print { flex: none; margin-left: 10px; }
 
   h1 {
     font-size: 18px;
@@ -77,11 +82,13 @@
 
   .scenario-fields {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
     margin-bottom: 2px;
   }
   .scenario-fields input, .scenario-fields textarea {
+    max-width: 100%;
     padding: 4px 8px;
     border: 1px solid var(--baseline);
     border-radius: 3px;
@@ -144,15 +151,18 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 440px 1fr;
-    height: calc(100vh - 60px);
+    grid-template-columns: 440px minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
   }
 
   @media (max-width: 900px) {
     html, body { overflow: auto; }
+    body { height: auto; }
     .layout {
       grid-template-columns: 1fr;
       height: auto;
+      flex: none;
     }
     .sidebar { max-height: none !important; overflow: visible !important; }
     .main { height: auto !important; }
@@ -325,6 +335,10 @@
   .preset-provenance .src { color: var(--text-secondary); font-weight: 600; }
 
   .math-toggle {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-family: inherit;
     font-size: 10px;
     color: var(--cat-1);
     cursor: pointer;
@@ -355,6 +369,13 @@
   }
   .hf-results.open { display: block; }
   .hf-result {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
     padding: 4px 6px;
     font-size: 11px;
     cursor: pointer;
@@ -385,6 +406,24 @@
     padding: 4px 0;
     cursor: pointer;
   }
+  .frontier-expand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  button:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 2px; }
+  [aria-invalid="true"] { border-color: #b00020 !important; }
+  .input-errors { color: #b00020; font-size: 11px; margin-top: 8px; }
+  .chart-status { font-size: 12px; color: var(--text-secondary); }
   .frontier-item.unchecked .frontier-row { opacity: 0.5; }
   .frontier-row input[type="checkbox"] {
     flex: none;
@@ -460,6 +499,7 @@
   }
 
   .breakeven-table {
+    overflow-x: auto;
     background: var(--surface-1);
     border: 1px solid var(--gridline);
     border-radius: 6px;
@@ -517,7 +557,7 @@
     .top-bar, .layout { display: none !important; }
     #printOverlay { display: block !important; position: static !important; overflow: visible !important; }
     #printOverlay .print-close, #printOverlay .print-actions { display: none !important; }
-    body { overflow: visible !important; height: auto !important; }
+    body { display: block !important; overflow: visible !important; height: auto !important; }
     html { overflow: visible !important; height: auto !important; }
   }
 </style>
@@ -528,8 +568,8 @@
   <div>
     <h1>Self-Hosted LLM Cost Calculator</h1>
     <div class="scenario-fields">
-      <input type="text" id="scenarioName" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
-      <textarea id="scenarioDesc" placeholder="Description (optional)"></textarea>
+      <input type="text" id="scenarioName" aria-label="Scenario name" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
+      <textarea id="scenarioDesc" aria-label="Scenario description" placeholder="Description (optional)"></textarea>
     </div>
   </div>
   <button class="btn-print" id="btnPrint">Print</button>
@@ -559,7 +599,7 @@
       <div class="panel-title">Self-Hosted Model</div>
 
       <div class="field hf-search-wrap">
-        <label>Model (search HuggingFace)</label>
+        <label for="hfSearch">Model (search HuggingFace)</label>
         <input type="text" id="hfSearch" placeholder="Search models..." autocomplete="off">
         <div class="hf-results" id="hfResults"></div>
       </div>
@@ -567,21 +607,21 @@
       <div class="section-label">Infrastructure</div>
       <div class="field-row">
         <div class="field">
-          <label>GPU type</label>
+          <label for="gpuType">GPU type</label>
           <input type="text" id="gpuType" value="H200" placeholder="e.g. H200, H100, A100">
         </div>
         <div class="field">
-          <label>GPUs per node</label>
+          <label for="gpusPerNode">GPUs per node</label>
           <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <label>Number of nodes</label>
+          <label for="numNodes">Number of nodes</label>
           <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
         </div>
         <div class="field">
-          <label>$/node/month</label>
+          <label for="costPerNode">$/node/month</label>
           <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
         </div>
       </div>
@@ -589,21 +629,21 @@
       <div class="section-label">Workload Shape</div>
       <div class="field-row">
         <div class="field">
-          <label>Concurrency (sessions)</label>
+          <label for="concurrency">Concurrency (sessions)</label>
           <input type="number" id="concurrency" value="128" min="1" step="1">
         </div>
         <div class="field">
-          <label>Cache hit rate (%)</label>
+          <label for="cacheHitRate">Cache hit rate (%)</label>
           <input type="number" id="cacheHitRate" value="87" min="0" max="100" step="1">
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <label>Avg ISL (tokens)</label>
+          <label for="avgIsl">Avg ISL (tokens)</label>
           <input type="number" id="avgIsl" value="30000" min="1" step="1000">
         </div>
         <div class="field">
-          <label>Avg OSL (tokens)</label>
+          <label for="avgOsl">Avg OSL (tokens)</label>
           <input type="number" id="avgOsl" value="2000" min="1" step="100">
         </div>
       </div>
@@ -611,12 +651,12 @@
       <div class="section-label">Serving Performance</div>
       <div class="field-row">
         <div class="field">
-          <label>Total goodput (tok/s)</label>
-          <input type="number" id="totalGoodput" value="96000" min="1" step="100">
+          <label for="totalGoodput">Total goodput (tok/s)</label>
+          <input type="number" id="totalGoodput" value="96000" min="0" step="100">
         </div>
         <div class="field">
-          <label>Output tok/s per user</label>
-          <input type="number" id="outputTpsPerUser" value="32" min="0.1" step="1">
+          <label for="outputTpsPerUser">Output tok/s per user</label>
+          <input type="number" id="outputTpsPerUser" value="32" min="0" step="1">
         </div>
       </div>
 
@@ -653,6 +693,7 @@
         These filtered coding traces favour longer sessions. Choose the matching corpus or edit the estimate; benchmark presets do not change it.
       </div>
 
+      <div id="inputErrors" class="input-errors" role="status" aria-live="polite" hidden></div>
       <div class="computed-box">
         <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
@@ -663,14 +704,14 @@
           <div>Monthly token demand: <span class="val" id="monthlyDemand">—</span></div>
           <div>Avg utilization: <span class="val" id="derivedUtil" style="font-size: 13px;">—</span> &nbsp; Self-hosted cost: <span class="val" id="shCostAtUtil" style="font-size: 13px;">—</span>/M</div>
         </div>
-        <div class="math-toggle" id="mathToggle">Show derivation</div>
+        <button type="button" class="math-toggle" id="mathToggle" aria-expanded="false" aria-controls="mathExplanation">Show derivation</button>
         <div class="math-detail" id="mathExplanation"></div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">Frontier API Pricing <span style="font-weight: 400; text-transform: none; font-size: 9px; color: var(--text-muted);">(live from OpenRouter)</span></div>
-      <div id="frontierLoading" class="loading-msg">Loading from OpenRouter...</div>
+      <div class="panel-title">Frontier API Pricing</div>
+      <div id="frontierLoading" class="loading-msg" role="status">Using snapshot; checking OpenRouter...</div>
       <ul class="frontier-list" id="frontierList"></ul>
     </div>
 
@@ -680,8 +721,9 @@
   <div class="main">
     <div class="chart-wrap">
       <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
+      <p id="chartStatus" class="chart-status" role="status" hidden></p>
       <div class="chart-canvas-holder">
-        <canvas id="costChart"></canvas>
+        <canvas id="costChart" role="img" aria-label="Self-hosted and API costs by utilization; numerical results are in the breakeven summary"></canvas>
       </div>
     </div>
 
@@ -715,6 +757,7 @@
   'use strict';
 
   const SECS_PER_YEAR = 365.25 * 24 * 3600;
+  const SECS_PER_MONTH = SECS_PER_YEAR / 12;
   const COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948','#0891b2','#8a5a44','#708160','#c2185b'];
   const SELF_HOSTED_COLOR = '#CC0000';
 
@@ -739,12 +782,12 @@
   // END FRONTIER_PRICING
 
   // BEGIN SCENARIO_PRESETS
-  // Snapshot: 2026-10-31
+  // Snapshot: 2026-11-01
   // Generated by scripts/refresh-presets.mjs from https://inferencex.semianalysis.com.
   // Each preset is a measured agentic-traces operating point from a single InferenceX
   // benchmark run on a vLLM- or SGLang-family stack. Selection: the highest-throughput
   // Pareto frontier point meeting a 35 tok/s per-user interactivity target.
-  // Demand-estimate inputs are left at the repo defaults.
+  // Demand-estimate inputs retain the user's current values.
   const SCENARIO_PRESETS = [
     { id: 'glm-5-2-gb200', label: 'GLM-5.2 · GB200 NVL72 · 135k:1k ISL:OSL, 76% cache', short: 'GLM-5.2 GB200', featured: true,
       source: { model: 'GLM-5.2', hardware: 'gb200', framework: 'dynamo-sglang', precision: 'fp4', disagg: true, concurrency: 336, date: '2026-10-23', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39765601214/attempts/2', gpuHourRate: 4 },
@@ -772,7 +815,7 @@
       values: { gpuType: 'MI355X', gpusPerNode: 8, numNodes: 3, costPerNode: 16936, concurrency: 48, cacheHitRate: 87.9, avgIsl: 148605, avgOsl: 1021, totalGoodput: 191133, outputTpsPerUser: 93.8 } },
     { id: 'kimi-k3-vr200', label: 'Kimi-K3 · Vera Rubin NVL72 · 143k:1k ISL:OSL, 69.1% cache', short: 'Kimi-K3 Vera Rubin', featured: false,
       source: { model: 'Kimi-K3', hardware: 'vr200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 256, date: '2026-10-23', runUrl: 'https://github.com/NVIDIA/nv-perf-sa-review/actions/runs/40034981619/attempts/4', gpuHourRate: 8.5 },
-      values: { gpuType: 'Vera Rubin NVL72', gpusPerNode: 8, numNodes: 4, costPerNode: 49640, concurrency: 256, cacheHitRate: 69.1, avgIsl: 142557, avgOsl: 1003, totalGoodput: 1432162, outputTpsPerUser: 121.4 } },
+      values: { gpuType: 'Vera Rubin NVL72', gpusPerNode: 32, numNodes: 1, costPerNode: 198560, concurrency: 256, cacheHitRate: 69.1, avgIsl: 142557, avgOsl: 1003, totalGoodput: 1432162, outputTpsPerUser: 121.4 } },
     { id: 'kimi-k3-gb300', label: 'Kimi-K3 · GB300 NVL72 · 139k:1k ISL:OSL, 11.7% cache', short: 'Kimi-K3 GB300', featured: false,
       source: { model: 'Kimi-K3', hardware: 'gb300', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 240, date: '2026-10-27', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40239967341/attempts/1', gpuHourRate: 5 },
       values: { gpuType: 'GB300 NVL72', gpusPerNode: 56, numNodes: 1, costPerNode: 204400, concurrency: 240, cacheHitRate: 11.7, avgIsl: 138723, avgOsl: 1000, totalGoodput: 1140792, outputTpsPerUser: 74.9 } },
@@ -782,9 +825,9 @@
     { id: 'muse-spark-open-gb200', label: 'Muse-Spark-Open · GB200 NVL72 · 155k:1k ISL:OSL, 11.9% cache', short: 'Muse-Spark-Open GB200', featured: false,
       source: { model: 'Muse-Spark-Open', hardware: 'gb200', framework: 'sglang', precision: 'fp4', disagg: false, concurrency: 32, date: '2026-10-27', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40279195159/attempts/1', gpuHourRate: 4 },
       values: { gpuType: 'GB200 NVL72', gpusPerNode: 4, numNodes: 1, costPerNode: 11680, concurrency: 32, cacheHitRate: 11.9, avgIsl: 154575, avgOsl: 989, totalGoodput: 155509, outputTpsPerUser: 116.7 } },
-    { id: 'minimax-m3-1-flash-gb200', label: 'MiniMax-M3.1-Flash · GB200 NVL72 · 143k:1k ISL:OSL, 60.2% cache', short: 'MiniMax-M3.1-Flash GB200', featured: false,
-      source: { model: 'MiniMax-M3.1-Flash', hardware: 'gb200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 352, date: '2026-10-29', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/40636603138/attempts/1', gpuHourRate: 4 },
-      values: { gpuType: 'GB200 NVL72', gpusPerNode: 32, numNodes: 1, costPerNode: 93440, concurrency: 352, cacheHitRate: 60.2, avgIsl: 143095, avgOsl: 1034, totalGoodput: 2244020, outputTpsPerUser: 288.2 } },
+    { id: 'minimax-m3-1-flash-gb200', label: 'MiniMax-M3.1-Flash · GB200 NVL72 · 147k:1k ISL:OSL, 56.7% cache', short: 'MiniMax-M3.1-Flash GB200', featured: false,
+      source: { model: 'MiniMax-M3.1-Flash', hardware: 'gb200', framework: 'dynamo-vllm', precision: 'fp4', disagg: true, concurrency: 360, date: '2026-11-01', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41084082993/attempts/2', gpuHourRate: 4 },
+      values: { gpuType: 'GB200 NVL72', gpusPerNode: 28, numNodes: 1, costPerNode: 81760, concurrency: 360, cacheHitRate: 56.7, avgIsl: 146711, avgOsl: 1034, totalGoodput: 2391825, outputTpsPerUser: 283.3 } },
     { id: 'minimax-m3-1-flash-h200', label: 'MiniMax-M3.1-Flash · H200 · 129k:1k ISL:OSL, 83.3% cache', short: 'MiniMax-M3.1-Flash H200', featured: false,
       source: { model: 'MiniMax-M3.1-Flash', hardware: 'h200', framework: 'vllm', precision: 'fp4', disagg: false, concurrency: 20, date: '2026-10-23', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39903574233/attempts/2', gpuHourRate: 2.9 },
       values: { gpuType: 'H200', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 20, cacheHitRate: 83.3, avgIsl: 129091, avgOsl: 968, totalGoodput: 82768, outputTpsPerUser: 99 } },
@@ -821,19 +864,90 @@
   const DEFAULT_CHECKED = new Set(FRONTIER_MODELS.filter(m => m.checked).map(m => m.id));
 
   const $ = id => document.getElementById(id);
-  const val = id => parseFloat($(id).value) || 0;
-  const fmt = (n, d = 2) => n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
-  const fmtDollar = (n, d = 0) => '$' + n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const val = id => $(id).value.trim() === '' ? NaN : Number($(id).value);
+  const fmt = (n, d = 2) => Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : 'N/A';
+  const fmtDollar = (n, d = 0) => Number.isFinite(n) ? '$' + fmt(n, d) : 'N/A';
+  const INPUT_RULES = {
+    gpusPerNode: { label: 'GPUs per node', min: 1, max: 144, integer: true },
+    numNodes: { label: 'Number of nodes', min: 1, max: 128, integer: true },
+    costPerNode: { label: 'Cost per node', min: 0 },
+    concurrency: { label: 'Concurrency', min: 1, integer: true },
+    totalGoodput: { label: 'Total goodput', min: 0 },
+    outputTpsPerUser: { label: 'Output tok/s per user', min: 0 },
+    cacheHitRate: { label: 'Cache hit rate', min: 0, max: 100 },
+    avgIsl: { label: 'Avg ISL', min: 1 },
+    avgOsl: { label: 'Avg OSL', min: 1 },
+    numUsers: { label: 'Number of users', min: 0 },
+    sessionsPerDay: { label: 'Sessions per day', min: 0 },
+    callsPerSession: { label: 'Calls per session', min: 0 },
+    workDays: { label: 'Working days', min: 1, max: 31 },
+  };
+
+  // Pure calculation entry point. Validation deliberately ignores HTML step
+  // sizes (benchmark measurements need not be multiples of the spinner step).
+  function calculateScenario(values, models) {
+    const errors = [];
+    for (const [id, rule] of Object.entries(INPUT_RULES)) {
+      const n = values[id];
+      if (!Number.isFinite(n) || n < rule.min || n > (rule.max ?? Infinity) || (rule.integer && !Number.isInteger(n))) {
+        errors.push({ id, message: `${rule.label}: enter ${rule.integer ? 'a whole number' : 'a number'} ${rule.max === undefined ? `≥ ${rule.min}` : `between ${rule.min} and ${rule.max}`}.` });
+      }
+    }
+    models.forEach((m, i) => {
+      for (const field of ['inputPrice', 'cachedPrice', 'outputPrice']) {
+        if (!Number.isFinite(m[field]) || m[field] < 0) errors.push({ id: `price-${i}-${field}`, message: `${m.name}: ${field} must be a finite, non-negative price.` });
+      }
+    });
+    if (errors.length) return { valid: false, errors };
+
+    const { gpusPerNode, numNodes, costPerNode, totalGoodput, avgIsl, avgOsl, cacheHitRate, numUsers, sessionsPerDay, callsPerSession, workDays } = values;
+    const totalGpus = numNodes * gpusPerNode;
+    const monthlyCost = numNodes * costPerNode;
+    const annualTco = monthlyCost * 12;
+    const tokensPerCall = avgIsl + avgOsl;
+    const inputFrac = avgIsl / tokensPerCall;
+    const outputFrac = avgOsl / tokensPerCall;
+    const cacheHitPct = cacheHitRate / 100;
+    const cachedFrac = inputFrac * cacheHitPct;
+    const uncachedFrac = inputFrac * (1 - cacheHitPct);
+    // Goodput is measured fleet capacity, including cached input. Workload
+    // edits require re-benchmarking; cache affects only the API billing blend.
+    const annualTotalTokens = totalGoodput * SECS_PER_YEAR;
+    const monthlySupply = totalGoodput * SECS_PER_MONTH;
+    const costPerMAt100 = totalGoodput > 0 ? annualTco / (annualTotalTokens / 1e6) : null;
+    const callsPerUserDay = sessionsPerDay * callsPerSession;
+    const tokensPerUserMo = callsPerUserDay * workDays * tokensPerCall;
+    const monthlyDemand = numUsers * tokensPerUserMo;
+    const derivedUtil = monthlySupply > 0 ? monthlyDemand / monthlySupply * 100 : null;
+    const overloaded = monthlyDemand > monthlySupply;
+    const costAtDerivedUtil = monthlyDemand > 0 && !overloaded ? monthlyCost / (monthlyDemand / 1e6) : null;
+    const allFrontierResults = models.map(m => {
+      const blended = uncachedFrac * m.inputPrice + cachedFrac * m.cachedPrice + outputFrac * m.outputPrice;
+      const breakeven = costPerMAt100 === null ? null : blended > 0 ? costPerMAt100 / blended * 100 : Infinity;
+      return { ...m, blended, breakeven, monthlyFrontierCost: blended * monthlyDemand / 1e6 };
+    });
+    const utilizations = Array.from({ length: 100 }, (_, i) => i + 1);
+    const selfHostedCosts = utilizations.map(u => costPerMAt100 === null ? null : costPerMAt100 / (u / 100));
+    const finiteResults = [totalGpus, monthlyCost, annualTco, tokensPerCall, annualTotalTokens, monthlySupply, callsPerUserDay, tokensPerUserMo, monthlyDemand,
+      ...[costPerMAt100, derivedUtil, costAtDerivedUtil, ...selfHostedCosts].filter(n => n !== null),
+      ...allFrontierResults.flatMap(m => [m.blended, m.monthlyFrontierCost])];
+    if (finiteResults.some(n => !Number.isFinite(n))) return { valid: false, errors: [{ message: 'Values are too large or too small to calculate reliably.' }] };
+    return { valid: true, errors: [], totalGpus, monthlyCost, annualTco, tokensPerCall, inputFrac, outputFrac, cacheHitPct, cachedFrac, uncachedFrac,
+      annualTotalTokens, monthlySupply, costPerMAt100, callsPerUserDay, tokensPerUserMo, monthlyDemand, derivedUtil, overloaded, costAtDerivedUtil,
+      utilizations, selfHostedCosts, allFrontierResults, frontierResults: allFrontierResults.filter(m => m.checked) };
+  }
 
   let frontierModels = [];
   let chart = null;
   let hfDebounce = null;
   let selectedModel = 'GLM-5.2';
+  let activePreset = null;
 
   // Math toggle
   $('mathToggle').addEventListener('click', () => {
     const detail = $('mathExplanation');
     detail.classList.toggle('open');
+    $('mathToggle').setAttribute('aria-expanded', String(detail.classList.contains('open')));
     $('mathToggle').textContent = detail.classList.contains('open') ? 'Hide derivation' : 'Show derivation';
   });
 
@@ -843,6 +957,7 @@
   const presetProvenance = $('presetProvenance');
 
   function applyPreset(preset) {
+    activePreset = preset;
     const v = preset.values;
     $('gpuType').value = v.gpuType;
     $('gpusPerNode').value = v.gpusPerNode;
@@ -871,6 +986,14 @@
     presetQuick.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
   }
 
+  function markCustomPreset() {
+    if (activePreset && $('scenarioName').value === activePreset.label) $('scenarioName').value = `Custom — based on ${activePreset.short}`;
+    activePreset = null;
+    presetSelect.value = 'custom';
+    setActiveQuickButton(null);
+    presetProvenance.classList.remove('open');
+  }
+
   function initPresets() {
     SCENARIO_PRESETS.forEach((p, i) => {
       const opt = document.createElement('option');
@@ -894,8 +1017,7 @@
 
     presetSelect.addEventListener('change', () => {
       if (presetSelect.value === 'custom') {
-        setActiveQuickButton(null);
-        presetProvenance.classList.remove('open');
+        markCustomPreset();
         return;
       }
       const p = SCENARIO_PRESETS[+presetSelect.value];
@@ -907,12 +1029,14 @@
   // --- HuggingFace model search ---
   const hfInput = $('hfSearch');
   const hfResults = $('hfResults');
+  let hfRequest = 0;
 
   hfInput.addEventListener('input', () => {
     clearTimeout(hfDebounce);
+    const request = ++hfRequest;
     const q = hfInput.value.trim();
     if (q.length < 2) { hfResults.classList.remove('open'); return; }
-    hfDebounce = setTimeout(() => searchHF(q), 300);
+    hfDebounce = setTimeout(() => searchHF(q, request), 300);
   });
 
   hfInput.addEventListener('focus', () => {
@@ -923,19 +1047,22 @@
     if (!e.target.closest('.hf-search-wrap')) hfResults.classList.remove('open');
   });
 
-  async function searchHF(query) {
+  async function searchHF(query, request = ++hfRequest) {
     try {
-      const r = await fetch(`https://huggingface.co/api/models?search=${encodeURIComponent(query)}&pipeline_tag=text-generation&sort=downloads&direction=-1&limit=15`);
-      const data = await r.json();
+      const data = await fetchJSON(`https://huggingface.co/api/models?search=${encodeURIComponent(query)}&pipeline_tag=text-generation&sort=downloads&direction=-1&limit=15`);
+      if (request !== hfRequest) return;
+      if (!Array.isArray(data)) throw new Error('Invalid model search response');
       hfResults.innerHTML = '';
       data.forEach(m => {
-        const div = document.createElement('div');
+        const div = document.createElement('button');
+        div.type = 'button';
         div.className = 'hf-result';
         const dlText = m.downloads ? `${(m.downloads / 1000).toFixed(0)}k downloads` : '';
         div.innerHTML = `<div>${esc(m.id)}</div><div class="dl">${esc(dlText)}</div>`;
         div.addEventListener('click', () => {
           selectedModel = m.id;
-          hfInput.value = '';
+          hfInput.value = m.id;
+          markCustomPreset();
           hfResults.classList.remove('open');
           render();
         });
@@ -943,63 +1070,87 @@
       });
       hfResults.classList.add('open');
     } catch (e) {
-      console.error('HF search error:', e);
+      console.warn('HF search error:', e);
     }
   }
 
   function esc(s) {
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
   // --- OpenRouter frontier pricing ---
+  async function fetchJSON(url, timeoutMs = 8000) {
+    const controller = new AbortController();
+    let timer;
+    try {
+      return await Promise.race([
+        (async () => {
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })(),
+        new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('Request timed out')); }, timeoutMs); }),
+      ]);
+    } finally { clearTimeout(timer); }
+  }
+
+  function resolveFrontierPricing(payload, snapshot = FRONTIER_MODELS) {
+    const data = payload?.data || payload;
+    if (!Array.isArray(data)) throw new Error('Invalid pricing response');
+    const modelMap = new Map(data.map(m => [m.id, m]));
+    const price = (value, decimals = 2) => {
+      const n = !['number', 'string'].includes(typeof value) || String(value).trim() === '' ? NaN : Number(value);
+      const factor = 10 ** decimals;
+      const result = Math.round(n * 1e6 * factor) / factor;
+      return Number.isFinite(result) && n >= 0 ? result : null;
+    };
+    let snapshotCount = 0;
+    let cacheFallbackCount = 0;
+    const models = snapshot.map((m, i) => {
+      const p = modelMap.get(m.id)?.pricing;
+      const inputPrice = price(p?.prompt);
+      const outputPrice = price(p?.completion);
+      let prices;
+      if (inputPrice === null || outputPrice === null) {
+        snapshotCount++;
+        prices = { inputPrice: m.inputPrice, cachedPrice: m.cachedPrice, outputPrice: m.outputPrice };
+      } else {
+        const cached = price(p.input_cache_read, 3);
+        if (cached === null) cacheFallbackCount++;
+        prices = { inputPrice, cachedPrice: cached ?? inputPrice, outputPrice };
+      }
+      return { ...m, ...prices, color: COLORS[i % COLORS.length] };
+    });
+    return { models, snapshotCount, cacheFallbackCount };
+  }
+
   async function loadFrontierPricing() {
     try {
-      const r = await fetch('https://openrouter.ai/api/v1/models');
-      const data = await r.json();
-      const modelMap = new Map();
-      (data.data || data).forEach(m => modelMap.set(m.id, m));
-
-      // Cached input prices can be sub-cent, so they keep 3 decimals; all
-      // other prices round to 2.
-      const price = (value, fallback, decimals = 2) => {
-        const n = parseFloat(value);
-        const factor = Math.pow(10, decimals);
-        return Number.isFinite(n) && n >= 0 ? Math.round(n * 1e6 * factor) / factor : fallback;
-      };
-
-      frontierModels = FRONTIER_MODELS.map((m, i) => {
-        const live = modelMap.get(m.id);
-        if (!live) console.warn('Frontier model missing from OpenRouter:', m.id);
-        const p = live?.pricing || {};
-        return {
-          id: m.id,
-          name: m.name,
-          inputPrice: live ? price(p.prompt, m.inputPrice) : m.inputPrice,
-          cachedPrice: live ? price(p.input_cache_read, m.cachedPrice, 3) : m.cachedPrice,
-          outputPrice: live ? price(p.completion, m.outputPrice) : m.outputPrice,
-          checked: DEFAULT_CHECKED.has(m.id),
-          color: COLORS[i % COLORS.length],
-        };
+      const result = resolveFrontierPricing(await fetchJSON('https://openrouter.ai/api/v1/models'));
+      frontierModels = result.models.map((m, i) => {
+        const previous = frontierModels[i];
+        const merged = { ...m, checked: previous.checked, editedPrices: previous.editedPrices };
+        previous.editedPrices.forEach(field => { merged[field] = previous[field]; });
+        return merged;
       });
-
-      $('frontierLoading').style.display = 'none';
+      $('frontierLoading').textContent = result.snapshotCount === FRONTIER_MODELS.length
+        ? 'Using pricing snapshot; OpenRouter returned no usable prices for these models.'
+        : `Prices from OpenRouter${result.snapshotCount ? `; ${result.snapshotCount} models use snapshot prices` : ''}${result.cacheFallbackCount ? `; ${result.cacheFallbackCount} missing cache prices use input rates` : ''}.`;
       renderFrontierList();
       render();
     } catch (e) {
-      $('frontierLoading').textContent = 'Failed to load. Using defaults.';
-      console.error('OpenRouter error:', e);
-      useFallbackPricing();
+      $('frontierLoading').textContent = 'OpenRouter unavailable. Using pricing snapshot (with any edits).';
+      console.warn('OpenRouter error:', e);
     }
   }
 
   function useFallbackPricing() {
     frontierModels = FRONTIER_MODELS.map((m, i) => ({
       ...m,
+      checked: DEFAULT_CHECKED.has(m.id),
       color: COLORS[i % COLORS.length],
+      editedPrices: new Set(),
     }));
-    $('frontierLoading').style.display = 'none';
     renderFrontierList();
     render();
   }
@@ -1032,26 +1183,28 @@
       li.innerHTML = `
         <div class="frontier-row">
           <input type="checkbox" data-idx="${i}" ${m.checked ? 'checked' : ''} aria-label="Plot ${esc(m.name)}">
+          <button type="button" class="frontier-expand" aria-label="Edit prices for ${esc(m.name)}" aria-expanded="false" aria-controls="frontier-detail-${i}">
           <span class="swatch" style="background: ${m.color};"></span>
-          <div class="frontier-row-main">
+          <span class="frontier-row-main">
             <span class="frontier-name">${esc(m.name)}</span>
             <span class="frontier-row-prices" id="rowprices-${i}">in $${fmt(m.inputPrice)} &middot; cached $${fmt(m.cachedPrice, 3)} &middot; out $${fmt(m.outputPrice)}</span>
-          </div>
+          </span>
           <span class="frontier-blended-val" id="blended-${i}">&mdash;</span>
           <span class="frontier-caret">&#9656;</span>
+          </button>
         </div>
-        <div class="frontier-detail">
+        <div class="frontier-detail" id="frontier-detail-${i}">
           <div class="frontier-prices">
-            <div><label>Input $/M</label><input type="number" data-idx="${i}" data-field="inputPrice" value="${m.inputPrice}" min="0" step="0.1"></div>
-            <div><label>Cached $/M</label><input type="number" data-idx="${i}" data-field="cachedPrice" value="${m.cachedPrice}" min="0" step="0.001"></div>
-            <div><label>Output $/M</label><input type="number" data-idx="${i}" data-field="outputPrice" value="${m.outputPrice}" min="0" step="0.5"></div>
+            <div><label for="price-${i}-inputPrice">Input $/M</label><input id="price-${i}-inputPrice" type="number" data-idx="${i}" data-field="inputPrice" value="${m.inputPrice}" min="0" step="0.1"></div>
+            <div><label for="price-${i}-cachedPrice">Cached $/M</label><input id="price-${i}-cachedPrice" type="number" data-idx="${i}" data-field="cachedPrice" value="${m.cachedPrice}" min="0" step="0.001"></div>
+            <div><label for="price-${i}-outputPrice">Output $/M</label><input id="price-${i}-outputPrice" type="number" data-idx="${i}" data-field="outputPrice" value="${m.outputPrice}" min="0" step="0.5"></div>
           </div>
           <div class="frontier-blended-math" id="blended-math-${i}"></div>
         </div>
       `;
-      li.querySelector('.frontier-row').addEventListener('click', e => {
-        if (e.target.closest('input')) return;
+      li.querySelector('.frontier-expand').addEventListener('click', e => {
         li.classList.toggle('expanded');
+        e.currentTarget.setAttribute('aria-expanded', String(li.classList.contains('expanded')));
       });
       list.appendChild(li);
     });
@@ -1066,7 +1219,8 @@
     list.querySelectorAll('input[type="number"]').forEach(inp => {
       inp.addEventListener('input', e => {
         const m = frontierModels[+e.target.dataset.idx];
-        m[e.target.dataset.field] = parseFloat(e.target.value) || 0;
+        m[e.target.dataset.field] = e.target.value.trim() === '' ? NaN : Number(e.target.value);
+        m.editedPrices.add(e.target.dataset.field);
         render();
       });
     });
@@ -1075,70 +1229,38 @@
   // --- Core cost computation ---
   function compute() {
     const gpuType = $('gpuType').value.trim() || 'GPU';
-    const gpusPerNode = val('gpusPerNode');
-    const numNodes = val('numNodes');
-    const costPerNode = val('costPerNode');
-    const totalGoodput = val('totalGoodput');
-    const cacheHitPct = val('cacheHitRate') / 100;
-    const avgIsl = val('avgIsl');
-    const avgOsl = val('avgOsl');
-
-    const totalGpus = numNodes * gpusPerNode;
-    const monthlyCost = numNodes * costPerNode;
-    const annualTco = monthlyCost * 12;
-
-    // Billing mix: providers charge per token delivered (cached input bills at
-    // the cached rate, not $0), so the blend weights come from the workload's
-    // token composition (ISL:OSL) split by cache hit rate.
-    const tokensPerCall = avgIsl + avgOsl;
-    const inputFrac = tokensPerCall > 0 ? avgIsl / tokensPerCall : 0;
-    const outputFrac = tokensPerCall > 0 ? avgOsl / tokensPerCall : 0;
-    const cachedFrac = inputFrac * cacheHitPct;
-    const uncachedFrac = inputFrac * (1 - cacheHitPct);
-
-    // Serving capacity is the measured total token throughput (input + output,
-    // cache hits included) of the fleet on this workload under its latency
-    // SLOs — exactly what benchmarks report (InferenceX total_tput_tps).
-    // Goodput is workload-specific: if you change the mix, re-benchmark rather
-    // than extrapolate. Cache hit rate affects only the frontier billing
-    // blend, not capacity.
-    const annualTotalTokens = totalGoodput > 0 ? totalGoodput * SECS_PER_YEAR : 0;
-    const costPerMAt100 = annualTotalTokens > 0 ? annualTco / (annualTotalTokens / 1e6) : 0;
+    const values = Object.fromEntries(Object.keys(INPUT_RULES).map(id => [id, val(id)]));
+    const result = calculateScenario(values, frontierModels);
+    document.querySelectorAll('[aria-invalid]').forEach(el => el.removeAttribute('aria-invalid'));
+    result.errors.forEach(error => { if (error.id) $(error.id)?.setAttribute('aria-invalid', 'true'); });
+    $('inputErrors').hidden = result.valid;
+    $('inputErrors').textContent = result.errors.map(error => error.message).join(' ');
+    if (!result.valid) {
+      for (const id of ['totalGpus', 'annualTco', 'islOslRatio', 'shCostPerM', 'dailyCallsPerUser', 'monthlyDemand', 'derivedUtil', 'shCostAtUtil']) $(id).textContent = 'N/A';
+      $('derivedUtil').style.color = '';
+      $('mathExplanation').textContent = 'Correct the highlighted inputs to calculate this scenario.';
+      document.querySelectorAll('.frontier-blended-val').forEach(el => { el.textContent = 'N/A'; });
+      document.querySelectorAll('.frontier-blended-math').forEach(el => { el.textContent = ''; });
+      return result;
+    }
+    const { gpusPerNode, numNodes, costPerNode, totalGoodput, avgIsl, avgOsl, numUsers, sessionsPerDay, callsPerSession, workDays } = values;
+    const { totalGpus, annualTco, tokensPerCall, outputFrac, cacheHitPct, cachedFrac, uncachedFrac,
+      annualTotalTokens, monthlySupply, costPerMAt100, callsPerUserDay, tokensPerUserMo, monthlyDemand, derivedUtil, overloaded, costAtDerivedUtil } = result;
 
     // Update computed display
-    $('totalGpus').textContent = `${totalGpus}× ${esc(gpuType)}`;
+    $('totalGpus').textContent = `${totalGpus}× ${gpuType}`;
     $('annualTco').textContent = fmtDollar(annualTco);
     $('islOslRatio').textContent = avgOsl > 0 ? (avgIsl / avgOsl).toFixed(1) + ':1' : 'N/A';
-    $('shCostPerM').textContent = '$' + fmt(costPerMAt100, 2);
-
-    // --- Demand estimate ---
-    const numUsers = val('numUsers');
-    const sessionsPerDay = val('sessionsPerDay');
-    const callsPerSession = val('callsPerSession');
-    const workDays = val('workDays');
-
-    // Usage is independent of streaming speed. Calls include the session's
-    // main-agent and subagent requests; ISL includes cached prompt tokens.
-    const callsPerUserDay = sessionsPerDay * callsPerSession;
-    const tokensPerUserMo = callsPerUserDay * workDays * tokensPerCall;
-    const monthlyDemand = numUsers * tokensPerUserMo;
-
-    const SECS_PER_MONTH = 30.44 * 86400;
-    const monthlySupply = totalGoodput > 0 ? totalGoodput * SECS_PER_MONTH : 0;
-    const derivedUtil = monthlySupply > 0 ? (monthlyDemand / monthlySupply) * 100 : 0;
-
-    const costAtDerivedUtil = derivedUtil > 0 ? costPerMAt100 / (Math.min(derivedUtil, 100) / 100) : 0;
+    $('shCostPerM').textContent = fmtDollar(costPerMAt100, 2);
 
     // Update demand display
     const demandB = (monthlyDemand / 1e9).toFixed(1);
     $('dailyCallsPerUser').textContent = fmt(callsPerUserDay);
     $('monthlyDemand').textContent = `${demandB}B tokens/month`;
-    $('derivedUtil').textContent = fmt(derivedUtil, 1) + '%';
-    $('shCostAtUtil').textContent = monthlyDemand > 0
-      ? '$' + fmt(derivedUtil > 100 ? costPerMAt100 : costAtDerivedUtil, 2)
-      : 'N/A';
+    $('derivedUtil').textContent = derivedUtil === null ? 'N/A — no capacity' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' — exceeds capacity' : '');
+    $('shCostAtUtil').textContent = costAtDerivedUtil === null ? (overloaded ? 'N/A — insufficient capacity' : 'N/A') : fmtDollar(costAtDerivedUtil, 2);
 
-    if (derivedUtil > 100) {
+    if (overloaded) {
       $('derivedUtil').style.color = '#e34948';
     } else {
       $('derivedUtil').style.color = '';
@@ -1154,30 +1276,21 @@
       `&bull; TCO = ${numNodes} &times; $${fmt(costPerNode)}/mo &times; 12 = <strong>${fmtDollar(annualTco)}</strong>/yr<br>` +
       `&bull; Total goodput = <strong>${fmt(totalGoodput, 0)} tok/s</strong> (measured, input + output tokens)<br>` +
       `&bull; Annual tokens = ${fmt(totalGoodput, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
-      `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 2)}/M</strong><br><br>` +
+      (costPerMAt100 === null ? `&bull; Cost/M at 100% = <strong>N/A — no measured capacity</strong><br><br>` :
+        `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>${fmtDollar(costPerMAt100, 2)}/M</strong><br><br>`) +
       `<strong>Utilization derivation:</strong><br>` +
       `&bull; Tokens/call = ${fmt(avgIsl, 0)} ISL + ${fmt(avgOsl, 0)} OSL = <strong>${fmt(tokensPerCall, 0)}</strong> (cached input included)<br>` +
       `&bull; Calls/user/day = ${fmt(sessionsPerDay)} sessions &times; ${fmt(callsPerSession)} calls/session = <strong>${fmt(callsPerUserDay)}</strong><br>` +
       `&bull; Tokens/user/mo = ${fmt(callsPerUserDay)} calls/day &times; ${fmt(workDays, 0)} days &times; ${fmt(tokensPerCall, 0)} tokens/call = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
       `&bull; Monthly demand = ${fmt(numUsers, 0)} users &times; ${(tokensPerUserMo / 1e6).toFixed(1)}M = <strong>${demandB}B tokens</strong><br>` +
       `&bull; Monthly supply = ${fmt(totalGoodput, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
-      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong><br>` +
+      `&bull; Avg utilization = <strong>${esc($('derivedUtil').textContent)}</strong><br>` +
       `Streaming speed does not change demand. Utilization is a calendar-month average, not a peak-capacity check.`;
-
-    // Self-hosted curve
-    const utilizations = [];
-    const selfHostedCosts = [];
-    for (let u = 1; u <= 100; u++) {
-      utilizations.push(u);
-      selfHostedCosts.push(costPerMAt100 / (u / 100));
-    }
 
     // Update blended cost for ALL frontier models
     const cacheHitDisplay = (cacheHitPct * 100).toFixed(0);
-    frontierModels.forEach((m, i) => {
-      const blended = uncachedFrac * m.inputPrice
-                    + cachedFrac * m.cachedPrice
-                    + outputFrac * m.outputPrice;
+    result.allFrontierResults.forEach((m, i) => {
+      const blended = m.blended;
 
       const el = document.getElementById('blended-' + i);
       if (el) el.textContent = `$${fmt(blended)}/M`;
@@ -1194,25 +1307,18 @@
       }
     });
 
-    // Frontier results for chart (checked only)
-    const frontierResults = frontierModels.filter(m => m.checked).map(m => {
-      const blended = uncachedFrac * m.inputPrice
-                    + cachedFrac * m.cachedPrice
-                    + outputFrac * m.outputPrice;
-
-      const breakeven = blended > 0 ? (costPerMAt100 / blended) * 100 : Infinity;
-
-      const monthlyFrontierCost = blended * (monthlyDemand / 1e6);
-
-      return { ...m, blended, breakeven, monthlyFrontierCost };
-    });
-
-    return { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens, derivedUtil };
+    return result;
   }
 
   // --- Chart rendering ---
   function render() {
-    const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, annualTotalTokens, derivedUtil } = compute();
+    const result = compute();
+    if (chart) { chart.destroy(); chart = null; }
+    $('breakevenBody').innerHTML = '';
+    $('chartStatus').hidden = result.valid && typeof Chart === 'function';
+    $('chartStatus').textContent = !result.valid ? 'Correct the highlighted inputs to view results.' : 'Chart unavailable. Numerical results are shown below.';
+    if (!result.valid) return;
+    const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, derivedUtil, overloaded } = result;
 
     const maxFrontier = Math.max(...frontierResults.map(f => f.blended), 0);
     // Auto-scale the y-axis to the self-hosted model under consideration:
@@ -1251,9 +1357,7 @@
       })),
     ];
 
-    if (chart) chart.destroy();
-
-    chart = new Chart($('costChart'), {
+    if (typeof Chart === 'function') chart = new Chart($('costChart'), {
       type: 'line',
       data: { labels: utilizations, datasets },
       options: {
@@ -1370,7 +1474,7 @@
               // Label
               ctx.fillStyle = SELF_HOSTED_COLOR;
               ctx.font = '700 10px system-ui';
-              const label = `Your scenario: ${fmt(clampedUtil, 1)}%`;
+              const label = overloaded ? 'Capacity limit: 100% (demand exceeds capacity)' : `Your scenario: ${fmt(clampedUtil, 1)}%`;
               const labelWidth = ctx.measureText(label).width;
               const labelX = x + 10 + labelWidth > xScale.right ? x - labelWidth - 10 : x + 10;
               ctx.fillText(label, labelX, y - 10);
@@ -1388,7 +1492,7 @@
     const tbody = $('breakevenBody');
     tbody.innerHTML = '';
     frontierResults.forEach(m => {
-      const bePct = m.breakeven <= 100 ? Math.round(m.breakeven) + '%' : '>100%';
+      const bePct = m.breakeven === null ? 'N/A' : m.breakeven <= 100 ? fmt(m.breakeven) + '%' : '>100%';
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><span class="swatch" style="background:${m.color};"></span>${esc(m.name)}</td>
@@ -1401,8 +1505,12 @@
   }
 
   // --- Wire up inputs ---
+  const benchmarkFields = new Set(Object.keys(SCENARIO_PRESETS[0].values));
   document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #totalGoodput, #outputTpsPerUser, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #numUsers, #sessionsPerDay, #callsPerSession, #workDays').forEach(inp => {
-    inp.addEventListener('input', render);
+    inp.addEventListener('input', () => {
+      if (benchmarkFields.has(inp.id)) markCustomPreset();
+      render();
+    });
   });
 
   document.querySelectorAll('[data-calls-per-session]').forEach(btn => {
@@ -1413,7 +1521,9 @@
   });
 
   // --- Print ---
-  function showPrintView() {
+  function buildPrintView() {
+    render();
+    if (chart) { chart.stop(); chart.update('none'); }
     const gpuType = $('gpuType').value.trim() || 'GPU';
     const gpusPerNode = val('gpusPerNode');
     const numNodes = val('numNodes');
@@ -1429,6 +1539,7 @@
       : '';
 
     const rows = [
+      ['Self-Hosted Model', selectedModel],
       ['GPU Type', gpuType],
       ['GPUs / Node', gpusPerNode],
       ['Nodes', numNodes],
@@ -1441,7 +1552,7 @@
       ['Avg OSL (tokens)', fmt(val('avgOsl'), 0)],
       ['', ''],
       ['Total Goodput (tok/s)', fmt(val('totalGoodput'), 0)],
-      ['Output tok/s per User', fmt(val('outputTpsPerUser'), 0)],
+      ['Output tok/s per User', fmt(val('outputTpsPerUser'))],
       ['', ''],
       ['Number of Users', fmt(val('numUsers'), 0)],
       ['Sessions / User / Day', fmt(val('sessionsPerDay'))],
@@ -1463,11 +1574,12 @@
     }).join('');
 
     const breakevenHtml = $('breakevenBody').innerHTML;
-    const chartImg = $('costChart').toDataURL('image/png');
+    const chartImg = chart ? $('costChart').toDataURL('image/png') : null;
 
     $('printContent').innerHTML = `
       ${titleHtml}
       ${descHtml}
+      ${$('inputErrors').hidden ? '' : `<p>${esc($('inputErrors').textContent)}</p>`}
       <p style="font-size:11px;color:#898781;margin:0 0 20px;">${new Date().toLocaleDateString()}</p>
 
       <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
@@ -1476,7 +1588,7 @@
           <table style="border-collapse:collapse;">${paramHtml}</table>
         </div>
         <div>
-          <img src="${chartImg}" style="width:100%;border:1px solid #e1e0d9;border-radius:6px;" />
+          ${chartImg ? `<img src="${chartImg}" alt="Cost comparison chart" style="width:100%;border:1px solid #e1e0d9;border-radius:6px;" />` : `<p>${esc($('chartStatus').textContent)}</p>`}
         </div>
       </div>
 
@@ -1496,19 +1608,21 @@
       </div>
 
       <p style="font-size:9px;color:#898781;text-align:center;margin-top:16px;">
-        Generated by Self-Hosted LLM Cost Calculator &mdash; Frontier pricing via OpenRouter API
+        Generated by Self-Hosted LLM Cost Calculator &mdash; ${esc($('frontierLoading').textContent)}
+        ${frontierModels.some(m => m.editedPrices.size) ? ' Includes manually edited prices.' : ''}
       </p>
     `;
 
-    $('printOverlay').classList.add('active');
   }
 
-  $('btnPrint').addEventListener('click', () => showPrintView());
+  $('btnPrint').addEventListener('click', () => { buildPrintView(); $('printOverlay').classList.add('active'); });
   $('printClose').addEventListener('click', () => $('printOverlay').classList.remove('active'));
   $('printNow').addEventListener('click', () => window.print());
+  window.addEventListener('beforeprint', buildPrintView);
 
   // --- Init ---
   initPresets();
+  useFallbackPricing();
   loadFrontierPricing();
 
 })();

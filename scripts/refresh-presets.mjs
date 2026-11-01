@@ -28,7 +28,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX_PATH = path.join(ROOT, 'index.html');
@@ -81,8 +81,7 @@ const CURATED = [
 ];
 
 function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
+  throw new Error(message);
 }
 
 const round = (n, d = 0) => Number(n.toFixed(d));
@@ -92,7 +91,7 @@ function quote(value) {
 }
 
 async function getJSON(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
   if (!response.ok) fail(`GET ${url} returned HTTP ${response.status}`);
   const payload = await response.json();
   if (payload && payload.error) fail(`GET ${url} returned error: ${payload.error}`);
@@ -108,28 +107,38 @@ function chipFor(chips, hwKey) {
   );
 }
 
-function totalGpus(row) {
+export function nodeSizeFor(chips, hardwareInfo) {
+  const size = chipFor(chips, hardwareInfo.key)?.scaleUpWorldSize;
+  if (Number.isInteger(size) && size > 0) return size;
+  // The chip catalog can lag the hardware catalog. NVL labels explicitly
+  // identify the scale-up domain. TPU7x retains the calculator's explicit
+  // eight-chip accounting unit until its topology is in the chip catalog.
+  const nvl = hardwareInfo.label.match(/\bNVL(\d+)\b/);
+  if (nvl && Number(nvl[1]) > 0) return Number(nvl[1]);
+  if (hardwareInfo.key === 'tpuv7') return 8;
+  fail(`missing node topology for ${hardwareInfo.key}; update the explicit topology mapping`);
+}
+
+export function totalGpus(row) {
   const prefill = Number(row.num_prefill_gpu) || 0;
   const decode = Number(row.num_decode_gpu) || 0;
   // Disaggregated rows count roles independently and should be summed;
   // aggregate engines mirror one count in both columns.
   const gpus = row.disagg ? prefill + decode : decode || prefill;
-  return gpus > 0 ? gpus : null;
+  return Number.isInteger(gpus) && gpus > 0 ? gpus : null;
 }
 
-function hitRate(row) {
-  const server = Number(row.metrics?.server_gpu_cache_hit_rate);
-  if (Number.isFinite(server) && server >= 0) return server;
-  const theoretical = Number(row.metrics?.theoretical_cache_hit_rate);
-  if (Number.isFinite(theoretical) && theoretical >= 0) return theoretical;
-  return null;
+export function hitRate(row) {
+  const server = row.metrics?.server_gpu_cache_hit_rate;
+  return Number.isFinite(server) && server >= 0 && server <= 1 ? server : null;
 }
 
-function eligible(row) {
+export function eligible(row) {
   const m = row.metrics || {};
   const num = v => Number.isFinite(v) && v > 0;
   return (
     row.benchmark_type === 'agentic_traces' &&
+    Number.isInteger(row.conc) && row.conc > 0 &&
     num(m.total_tput_tps) &&
     num(m.mean_input_tokens) &&
     num(m.mean_output_tokens_actual) &&
@@ -140,9 +149,12 @@ function eligible(row) {
   );
 }
 
-function buildPreset(entry, row, hardwareInfo, nodeSize) {
+export function buildPreset(entry, row, hardwareInfo, nodeSize) {
   const m = row.metrics;
   const gpus = totalGpus(row);
+  if (!eligible(row)) fail('cannot build a preset from an ineligible benchmark');
+  if (!Number.isInteger(nodeSize) || nodeSize <= 0) fail('invalid node size');
+  if (!Number.isFinite(hardwareInfo.costPerHour?.r) || hardwareInfo.costPerHour.r < 0) fail('missing rental price');
 
   // Topology: full scale-up domains become N nodes; a sub-domain partition
   // (e.g. 24 of 72 NVL72 GPUs) becomes a single node of that size so the
@@ -207,7 +219,7 @@ function buildPreset(entry, row, hardwareInfo, nodeSize) {
  * A point is kept unless another point matches or beats it on both axes and
  * strictly beats it on at least one.
  */
-function paretoFrontier(rows) {
+export function paretoFrontier(rows) {
   const pts = rows.map(r => ({ row: r, t: r.metrics.total_tput_tps, i: r.metrics.median_intvty }));
   return pts
     .filter(a => !pts.some(b => b !== a && b.t >= a.t && b.i >= a.i && (b.t > a.t || b.i > a.i)))
@@ -217,15 +229,15 @@ function paretoFrontier(rows) {
 /** Pick the operating point: max-throughput frontier point meeting the
  *  interactivity target; if the whole frontier is slower than the target,
  *  fall back to the most interactive frontier point. Newest date breaks ties. */
-function pickOperatingPoint(rows) {
+export function pickOperatingPoint(rows) {
   const frontier = paretoFrontier(rows);
   const onTarget = frontier.filter(r => r.metrics.median_intvty >= INTERACTIVITY_TARGET);
-  const pool = onTarget.length ? onTarget : [...frontier].sort((a, b) => b.metrics.median_intvty - a.metrics.median_intvty);
+  const pool = onTarget.length ? onTarget : frontier;
+  const primary = onTarget.length ? 'total_tput_tps' : 'median_intvty';
   return pool.sort(
     (a, b) =>
-      (b.metrics.total_tput_tps - a.metrics.total_tput_tps) ||
-      ((b.date > a.date) - (a.date > b.date)) ||
-      (b.metrics.median_intvty - a.metrics.median_intvty)
+      (b.metrics[primary] - a.metrics[primary]) ||
+      ((b.date > a.date) - (a.date > b.date))
   )[0];
 }
 
@@ -247,7 +259,7 @@ function renderBlock(presets, today) {
     '  // Each preset is a measured agentic-traces operating point from a single InferenceX',
     '  // benchmark run on a vLLM- or SGLang-family stack. Selection: the highest-throughput',
     '  // Pareto frontier point meeting a 35 tok/s per-user interactivity target.',
-    '  // Demand-estimate inputs are left at the repo defaults.',
+    '  // Demand-estimate inputs retain the user\'s current values.',
     '  const SCENARIO_PRESETS = [',
     ...lines,
     '  ];',
@@ -304,8 +316,7 @@ async function main() {
 
     const row = pickOperatingPoint(rows);
 
-    const chip = chipFor(chips, entry.hardware);
-    const nodeSize = Number(chip?.scaleUpWorldSize) || 8;
+    const nodeSize = nodeSizeFor(chips, hardwareInfo);
     presets.push(buildPreset(entry, row, hardwareInfo, nodeSize));
   }
 
@@ -350,4 +361,6 @@ async function main() {
   }
 }
 
-main().catch(error => fail(error.stack || error.message));
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
+}

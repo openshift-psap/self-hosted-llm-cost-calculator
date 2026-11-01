@@ -15,20 +15,26 @@ https://openshift-psap.github.io/self-hosted-llm-cost-calculator/
 ## Commands
 
 ```sh
+npm ci                                  # install test-only dependencies (Node 22+)
+npm test                                # offline financial/DOM + refresh tests
+npx playwright install chromium         # browser setup; --with-deps on fresh Linux
+npm run test:browser                     # real Chromium and Chart.js, mocked APIs
 node scripts/refresh-pricing.mjs --check   # frontier pricing snapshot freshness
 node scripts/refresh-presets.mjs --check   # scenario preset snapshot freshness
 node scripts/refresh-pricing.mjs --write   # regenerate pricing from OpenRouter
 node scripts/refresh-presets.mjs --write   # regenerate presets from InferenceX
-node scripts/test-calculations.mjs        # offline calculation + DOM-shim smoke tests
+node scripts/test-calculations.mjs        # calculation + jsdom interaction suite
 
 # Inline JS syntax check (the app is one <script> block in index.html):
 node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];fs.writeFileSync('/tmp/opencode/inline.js',m.at(-1)[1]);"
 node --check /tmp/opencode/inline.js
 ```
 
-Both snapshot `--check` commands and `test-calculations.mjs` must pass before
-every deploy, including documentation-only changes. They are part of the
-commit-push-deploy skill preflight. Snapshots are baked into `index.html`
+Both snapshot `--check` commands, `npm test`, and `npm run test:browser` must
+pass before every deploy, including documentation-only changes. The Pages
+workflow enforces them and also validates pull requests. Only `index.html` is
+published. They are part of the commit-push-deploy skill preflight.
+Snapshots are baked into `index.html`
 between marker comments because the source APIs do not all send CORS headers.
 
 ## The cost model (current semantics — several earlier designs were replaced)
@@ -73,9 +79,10 @@ flipped conclusions. Do not go back.)
 
 Users × sessions/user/day × model calls/session × working days × (ISL + OSL)
 → monthly demand →
-`avg utilization = demand / (total_goodput × seconds_per_month)`. The
-average-utilization readout turning red above 100% is the only overload
-signal. A peak-concurrent calculation existed and was **deliberately removed**
+`avg utilization = demand / (total_goodput × seconds_per_month)`. Above 100%,
+the utilization readout turns red and says demand exceeds capacity; scenario
+cost is N/A. The chart's clipped marker is labeled as the capacity limit.
+A peak-concurrent calculation existed and was **deliberately removed**
 at the user's request — do not re-add it.
 
 Demand is independent of output tok/s/user. The former active-hours/duty-cycle
@@ -91,6 +98,9 @@ calls/session reference. Cost per consumed token is N/A at zero demand.
 
 Monthly API bills use `blended/M × monthlyDemand / 1e6`, not a hardcoded
 utilization. API blended $/M and breakeven utilization stay demand-independent.
+Monthly capacity uses `SECS_PER_YEAR / 12`, so consumed-token cost equals the
+monthly fleet bill divided by monthly demand when demand can be served.
+Zero goodput produces N/A utilization and self-hosted costs, never a free fleet.
 
 ### Updating the Weka demand references
 
@@ -134,6 +144,11 @@ no fixed floor or cap.
 - The frontier list UI is provider-grouped accordion rows: one compact row per
   model (checkbox, swatch, name, price triple, blended $/M); price editing and
   blend math expand on click. Keep it compact.
+- Snapshot prices render immediately; live requests time out after eight seconds.
+  Keep fallback status visible. Missing live cached pricing uses the live input
+  rate, consistently with the refresh script. A model with unusable input/output
+  prices retains its complete snapshot triple. Preserve edits and selections
+  when live data arrives. Chart unavailability must not prevent numerical output.
 
 ## Scenario presets
 
@@ -172,6 +187,13 @@ floor" and picked dominated points off the frontier. Do not regress.
 Presets set infrastructure, workload-shape, and serving fields — and the model
 search box. They **never** touch demand-estimate inputs (users, sessions/day,
 calls/session, working days), which retain the user's current values.
+Editing benchmark fields switches to Custom and clears measured attribution;
+demand edits do not. Missing/null/theoretical-only cache measurements are
+ineligible. Cache rates must be finite numbers in [0, 1].
+
+Topology uses catalog `scaleUpWorldSize`, then explicit `NVLnn` hardware labels.
+TPU7x has an explicit eight-chip accounting fallback until catalog coverage is
+available. Unknown hardware must not silently acquire an eight-GPU node size.
 
 ### UI conventions
 
@@ -205,14 +227,24 @@ Muse-Spark-Open/MI355X).
   intelligence-class matching (LMArena-style leaderboards are the candidate
   source if that feature is ever built; a design was explored and shelved).
 
-## Testing without a browser
+## Testing
 
-Run `node scripts/test-calculations.mjs` for offline regression checks. It
-syntax-checks the inline script and runs it with `document`/`Chart`/`fetch`
-stubs, exercising session-demand inputs, speed independence, API bills,
-Weka reference buttons, benchmark preset preservation, zero demand, and print
-output. It does not verify real-browser layout or canvas rendering. Both
-snapshot `--check` commands are also required before deployment.
+After `npm ci`, run `npm test` for deterministic `node:test` suites. The
+calculation suite syntax-checks the production inline script and runs it in
+jsdom with real DOM parsing/events and fresh app instances. Only network and
+chart drawing are stubbed. Independent financial references, boundary cases,
+all preset mappings, both exact Weka references, pricing edits, network failures
+and print events are covered. Keep assertions locale-independent.
+
+The refresh suite imports guarded CLI helpers directly, with fixtures for
+Pareto selection, measured cache validation, topology and price conversion.
+Snapshot checks are freshness checks, not independent algorithm verification.
+
+`npm run test:browser` exercises real Chromium and the matching local Chart.js
+version with mocked APIs: chart annotations, pricing controls, keyboard access,
+mobile header layout, actual PDF generation, timeout and CDN failure. The Node
+suite's chart stub does not cover canvas rendering. Browser dependencies are
+test-only; there is no application build step.
 
 Important invariants: doubling usage doubles demand and API bills without
 changing blended $/M or breakeven utilization; changing streaming speed leaves
@@ -220,23 +252,18 @@ demand unchanged; changing capacity alone leaves API bills unchanged; cache
 changes affect billing, not demand or measured self-hosted capacity. Presets
 must preserve edited demand inputs, not reset them to defaults.
 
-## Known review findings not yet fixed
+## Validation and presentation invariants
 
-The session-demand and monthly-bill changes do not resolve every review item:
+`calculateScenario` is a pure input-to-result function inside the inline app.
+Numeric ranges and finite values are validated there, independently of HTML
+attributes. Empty fields are invalid, not zero. Physical node/GPU counts and
+concurrency are integers; spinner step sizes are not validation constraints.
+Invalid scenarios clear numerical results and identify the offending fields.
+Zero demand, zero capacity and overloaded demand are distinct states.
 
-- HTML `min`/`max` attributes are not calculation validation. Out-of-range
-  values remain possible, and zero goodput still displays 0% utilization and
-  $0/M despite positive demand. Zero **demand** is handled separately as N/A.
-- Above 100% average utilization, the scenario cost and chart marker still
-  clamp to full capacity. Do not present that as serving all offered demand.
-- `refresh-presets.mjs` re-sorts its below-target fallback by throughput,
-  overriding the documented most-interactive selection. Its cache-rate
-  helper also converts `null` to zero and can substitute a theoretical rate;
-  do not describe those cases as verified measured cache rates.
-- Monthly capacity uses 30.44 days while annual capacity uses 365.25 days;
-  this introduces a small (~0.0082%) monthly/annual inconsistency.
-
-Treat these as follow-up work, not fixes already covered by the smoke tests.
+Native `beforeprint` regenerates the report, including current validation and
+pricing-source status. A printed chart is captured only after synchronous
+rendering. Accordion controls must remain keyboard accessible and inputs named.
 
 ## Skills
 

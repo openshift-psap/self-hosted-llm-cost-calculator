@@ -75,6 +75,16 @@ Average utilization covers the entire calendar month, including idle hours;
 it is not a peak-capacity guarantee. Cost per consumed token is N/A at zero
 demand, although the fixed fleet bill remains payable.
 
+Monthly capacity uses exactly one twelfth of the 365.25-day annual capacity.
+When demand exceeds capacity, the utilization readout says so and the scenario
+cost is **N/A — insufficient capacity**. A chart marker at 100% then identifies
+the capacity limit, not a feasible scenario. With zero goodput, utilization and
+self-hosted $/M are N/A; API bills still reflect the offered demand.
+
+Inputs are validated for finite values and permitted ranges before results are
+shown. Invalid or empty numeric fields must be corrected; they are not silently
+treated as zero. Benchmark measurements need not match input spinner step sizes.
+
 ## Default parameters
 
 The defaults model an agentic coding workload served by [llm-d](https://github.com/llm-d/llm-d) on 8 × IBM Cloud 8xH200 nodes (64 H200 GPUs):
@@ -125,6 +135,8 @@ Demand-estimate inputs (number of users, sessions/user/day, calls/session,
 working days) are deliberately **not** touched by benchmark presets — they
 retain the user's current values. Corpus call counts are selected separately
 from infrastructure presets; presets do not establish daily user activity.
+Editing a benchmark field switches the scenario to Custom and clears its
+measured-run attribution. Editing demand inputs retains the preset attribution.
 
 The InferenceX API does not send CORS headers, so presets are baked into
 `index.html` as a snapshot between `BEGIN/END SCENARIO_PRESETS` markers:
@@ -142,10 +154,23 @@ default InferenceX's own calculator uses). Runs at higher concurrency trade
 per-user streaming speed for total throughput; the target keeps presets on
 the efficient frontier at a usable interactivity. Edit `CURATED` to change
 the catalog or `INTERACTIVITY_TARGET` to change the operating point.
+If no eligible frontier point meets the target, the most interactive point is
+selected. Missing, theoretical-only, or out-of-range cache measurements are
+excluded. Node sizes come from the chip catalog, or an explicit NVL domain in
+the hardware label. TPU7x retains an explicit eight-chip accounting unit while
+absent from the chip catalog; other unknown topologies fail refresh.
 
 ## Frontier pricing snapshot
 
-The calculator fetches live prices from OpenRouter on load. The table below is the
+The calculator renders snapshot prices immediately, then fetches live prices
+from OpenRouter with an eight-second timeout. The visible pricing status reports
+snapshot fallback and missing cached prices. For a usable live model without a
+cached-input price, both the app and refresh script use its input price. Missing
+input/output prices retain the model's complete snapshot price triple in the app;
+the maintenance script rejects incomplete pricing. User price edits are preserved
+when the background request completes.
+
+The table below is the
 offline fallback baked into `index.html`, refreshed on **2026-10-31**. Prices are
 USD per 1M tokens. Only closed frontier APIs are listed — open-weight models
 (DeepSeek, Kimi, GLM, Qwen, ...) are excluded from the comparison, since
@@ -161,14 +186,14 @@ self-hosting them is exactly what this calculator evaluates.
 | GPT-6.1 Terra | $1.00 | $0.05 | $5.00 |
 | GPT-6.1 Sol Pro | $2.00 | $0.10 | $10.00 |
 | Gemini 4 Argon | $2.00 | $0.10 | $10.00 |
-| Gemini 3.8 Flash | $0.83 | $0.08 | $4.13 |
+| Gemini 3.8 Flash | $0.83 | $0.083 | $4.13 |
 | Grok 4.7 | $2.00 | $0.50 | $6.00 |
-| Nova Premier 1.0 | $2.50 | $0.63 | $12.50 |
+| Nova Premier 1.0 | $2.50 | $0.625 | $12.50 |
 | Command A+ | $0.30 | $0.15 | $1.50 |
 
 ### Refreshing pricing
 
-The repo includes an agent skill and a small Node.js (18+) script for keeping the
+The repo includes an agent skill and a small Node.js (22+) script for keeping the
 snapshot current. Cached input prices keep 3 decimals (they can be sub-cent);
 all other prices round to 2:
 
@@ -186,7 +211,9 @@ to add or remove a model family.
 ### Deploying
 
 Pushing to `main` triggers the GitHub Pages workflow in
-`.github/workflows/pages.yml`. See
+`.github/workflows/pages.yml`. Pull requests run the same validation. Deployment
+requires successful calculation/DOM tests, refresh-algorithm tests, browser
+tests, and both live snapshot checks. Only `index.html` is published. See
 `.claude/skills/commit-push-deploy/SKILL.md` for the commit, push, watch, and
 live-site verification workflow.
 
@@ -194,8 +221,34 @@ live-site verification workflow.
 
 Single HTML file, no build step. Uses Chart.js 4.x from CDN, vanilla JavaScript, and browser `fetch()` for API calls (OpenRouter and HuggingFace support CORS; InferenceX does not, so presets are baked as a snapshot). The pricing and preset refresh scripts are maintenance tools only; they are not part of the deployed page.
 
-Run `node scripts/test-calculations.mjs` for offline calculation and DOM-shim
-interaction checks, including demand, monthly API bills, presets, and printing.
+Numerical results remain usable if the Chart.js CDN is unavailable. The app's
+Print button and native browser printing both regenerate a current report.
+
+## Testing
+
+Development checks require Node.js 22+ and test-only dependencies; the deployed
+page remains a single static HTML file.
+
+```sh
+npm ci
+npm test                             # offline node:test + jsdom suites
+npx playwright install chromium     # add --with-deps on a fresh Linux host
+npm run test:browser                 # real Chromium, local Chart.js, mocked APIs
+npm run check:snapshots              # live OpenRouter and InferenceX checks
+```
+
+`node scripts/test-calculations.mjs` remains available after `npm ci`. It uses
+an actual parsed DOM and fresh app instances, independent financial reference
+values, exact Weka references, all preset field mappings, validation boundaries,
+pricing controls, network failure paths, and native-print events. Its chart stub
+does not draw; the browser suite exercises the real chart and annotations,
+keyboard controls, mobile layout, PDF printing, API timeouts, and CDN failure.
+`scripts/test-refresh.mjs` tests selection, topology and pricing policies against
+deterministic fixtures without network access.
+
+For an installed local Chrome, use
+`CHROMIUM_EXECUTABLE=/usr/bin/google-chrome npm run test:browser`.
+Locale-independent assertions are also checked in CI with `LANG=de_DE.UTF-8`.
 
 ## License
 

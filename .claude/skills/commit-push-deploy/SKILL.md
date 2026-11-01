@@ -6,8 +6,8 @@ description: Validate, commit, push, and deploy changes to the self-hosted LLM c
 # Commit, Push, Deploy
 
 This repo deploys automatically: a push to `main` triggers
-`.github/workflows/pages.yml`, which publishes the repository root with GitHub
-Pages. There is no build step.
+`.github/workflows/pages.yml`, which validates the change before publishing
+`index.html` with GitHub Pages. There is no application build step.
 
 ## 1. Preflight
 
@@ -15,16 +15,21 @@ Pages. There is no build step.
 git status --short
 git diff
 git diff --check
+npm ci                                  # Node.js 22+, test-only dependencies
+npm test                                # financial/DOM and refresh-policy tests
+npx playwright install chromium         # add --with-deps on fresh Linux hosts
+npm run test:browser                     # real Chromium + Chart.js, mocked APIs
 node scripts/refresh-pricing.mjs --check   # pricing snapshot must not be stale
 node scripts/refresh-presets.mjs --check   # scenario preset snapshot must not be stale
-node scripts/test-calculations.mjs        # offline calculation and interaction checks
 ```
 
-Run all three Node checks for every deployment, including documentation-only
-changes. The regression script also syntax-checks the inline app and verifies
-session-based demand, speed independence, monthly API bills, Weka reference
-buttons, preset preservation, zero demand, and print output. It does not test
-real-browser layout or canvas drawing.
+Run both test suites and both snapshot checks for every deployment, including
+documentation-only changes. CI enforces them before deployment and also runs
+the calculation suite under a German locale. The offline suites use jsdom,
+independent financial references and refresh-policy fixtures. Browser tests
+exercise canvas annotations, keyboard controls, mobile layout, native printing,
+API timeout and CDN failure. An installed Chrome can be selected with
+`CHROMIUM_EXECUTABLE=/usr/bin/google-chrome npm run test:browser`.
 
 If `index.html` changed, also check the inline JavaScript:
 
@@ -134,9 +139,10 @@ cache-busting query string before assuming the deploy failed.
 
 ## Failure handling
 
-- **Workflow failed**: read the failed step in the run URL. This workflow only
-  uploads and deploys the repo root, so failures are usually Pages permissions,
-  environment protection, or a missing `index.html`.
+- **Workflow failed**: read the failed step in the run URL. Validation failures
+  (including stale snapshots) block deployment. Browser failure artifacts are
+  uploaded as `browser-test-results`. If validation passed, check Pages
+  permissions, environment protection, and the staged `index.html` artifact.
 - **Pages not updating**: confirm the run succeeded and the `github-pages`
   environment points at the right artifact. Do not re-run with `--force`.
 - **Bad deploy already live**: report the failure. If a rollback is authorized,

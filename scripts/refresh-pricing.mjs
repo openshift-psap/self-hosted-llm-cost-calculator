@@ -13,7 +13,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX_PATH = path.join(ROOT, 'index.html');
@@ -45,16 +45,16 @@ const FAMILIES = [
 ];
 
 function fail(message) {
-  console.error(`error: ${message}`);
-  process.exit(1);
+  throw new Error(message);
 }
 
 // Cached input prices can be sub-cent, so they keep 3 decimals; all other
 // prices round to 2.
-function perMillion(value, decimals = 2) {
-  const n = parseFloat(value);
+export function perMillion(value, decimals = 2) {
+  const n = !['number', 'string'].includes(typeof value) || String(value).trim() === '' ? NaN : Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
-  return roundPrice(n * 1e6, decimals);
+  const result = roundPrice(n * 1e6, decimals);
+  return Number.isFinite(result) ? result : null;
 }
 
 function roundPrice(n, decimals = 2) {
@@ -71,8 +71,8 @@ function displayName(model) {
   return String(model.name || model.id).replace(/^[^:]+:\s*/, '').trim();
 }
 
-function pickModels(payload) {
-  const models = payload.data || payload;
+export function pickModels(payload) {
+  const models = payload?.data || payload;
   if (!Array.isArray(models)) fail('unexpected OpenRouter response: missing data array');
 
   return FAMILIES.map(family => {
@@ -146,6 +146,7 @@ async function main() {
 
   const response = await fetch(MODELS_URL, {
     headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) fail(`OpenRouter returned HTTP ${response.status}`);
 
@@ -193,4 +194,6 @@ async function main() {
   }
 }
 
-main().catch(error => fail(error.stack || error.message));
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
+}

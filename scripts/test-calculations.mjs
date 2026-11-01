@@ -1,193 +1,273 @@
 #!/usr/bin/env node
-// Dependency-free calculation and interaction smoke tests for the inline app.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
+import test from 'node:test';
+import { createApp, flush } from './test-support.mjs';
 
-const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-new vm.Script(inline); // Check the unmodified production script, too.
-
-const escapeHtml = text => String(text).replace(/[&<>"']/g, c => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-}[c]));
-
-class Element {
-  constructor(tag = 'div') {
-    this.tag = tag;
-    this.value = '';
-    this.dataset = {};
-    this.style = {};
-    this.children = [];
-    this.listeners = new Map();
-    this.markup = '';
-    this.text = '';
-    const classes = new Set();
-    this.classList = {
-      add: name => classes.add(name),
-      remove: name => classes.delete(name),
-      contains: name => classes.has(name),
-      toggle(name, force = !classes.has(name)) {
-        if (force) classes.add(name); else classes.delete(name);
-      },
-    };
-  }
-  set innerHTML(value) { this.markup = value; this.text = ''; this.children = []; }
-  get innerHTML() { return this.markup + escapeHtml(this.text) + this.children.map(c => c.innerHTML).join(''); }
-  set textContent(value) { this.text = String(value); this.markup = ''; this.children = []; }
-  get textContent() { return this.text; }
-  appendChild(child) { this.children.push(child); }
-  addEventListener(type, fn) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(fn);
-  }
-  fire(type) {
-    assert(this.listeners.has(type), `Missing ${type} listener`);
-    this.listeners.get(type).forEach(fn => fn({ target: this }));
-  }
-  querySelectorAll(selector) {
-    return selector === 'button' ? this.children.filter(c => c.tag === 'button') : [];
-  }
-  querySelector(selector) {
-    const preset = selector.match(/^\[data-preset-id="([^"]+)"\]$/);
-    return preset ? this.children.find(c => c.dataset.presetId === preset[1]) : new Element();
-  }
-  toDataURL() { return 'data:image/png;base64,'; }
-}
-
-const elements = new Map();
-const markup = html.slice(0, html.lastIndexOf('<script>'));
-for (const [, tag, attributes, id] of markup.matchAll(/<([a-z][\w-]*)\b([^>]*\bid="([^"]+)"[^>]*)>/g)) {
-  const el = new Element(tag);
-  el.value = attributes.match(/\bvalue="([^"]*)"/)?.[1] ?? '';
-  elements.set(id, el);
-}
-const references = [...markup.matchAll(/<button\b[^>]*data-calls-per-session="([^"]+)"[^>]*>/g)].map(([, value]) => {
-  const btn = new Element('button');
-  btn.dataset.callsPerSession = value;
-  return btn;
-});
-const $ = id => {
-  assert(elements.has(id), `Unknown element #${id}`);
-  return elements.get(id);
-};
-const defaults = new Map([...elements].map(([id, el]) => [id, el.value]));
-const context = vm.createContext({
-  document: {
-    getElementById: id => elements.get(id) ?? null,
-    createElement: tag => new Element(tag),
-    addEventListener() {},
-    querySelectorAll(selector) {
-      return selector === '[data-calls-per-session]'
-        ? references
-        : selector.split(',').map(s => $(s.trim().slice(1)));
-    },
-  },
-  Chart: class { destroy() {} },
-  // An empty catalog exercises the baked-price fallback for each model.
-  fetch: async () => ({ json: async () => ({ data: [] }) }),
-  console: { warn() {}, error: (...args) => assert.fail(args.join(' ')) },
-});
-const marker = '  // --- Init ---';
-assert(inline.includes(marker));
-vm.runInContext(inline.replace(marker,
-  `  globalThis.testApi = { compute, presets: SCENARIO_PRESETS };\n${marker}`), context);
-await new Promise(resolve => setImmediate(resolve));
-const { compute, presets } = context.testApi;
-const reset = () => defaults.forEach((value, id) => { $(id).value = value; });
-const set = (id, value) => { $(id).value = String(value); $(id).fire('input'); };
 const near = (actual, expected) => assert(Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 1e-12), `${actual} != ${expected}`);
-const demand = result => result.derivedUtil / 100 * Number($('totalGoodput').value) * 30.44 * 86400;
+const referenceModel = { id: 'test/reference', name: 'Reference API', inputPrice: 4, cachedPrice: 0.2, outputPrice: 20, checked: true };
+const monthlyDemand = 35406976000;
+const monthlyCost = 92782.72;
 
-const baseline = compute();
-const baselineCost = $('shCostAtUtil').textContent;
-const monthlyDemand = 200 * 1 * 251.47 * 22 * (30000 + 2000);
-near(demand(baseline), monthlyDemand);
-assert.equal($('dailyCallsPerUser').textContent, '251.47');
-near(baseline.frontierResults[0].monthlyFrontierCost, monthlyDemand / 1e6 * 1.900625);
-
-for (const [id, value, factor] of [
-  ['numUsers', 400, 2], ['sessionsPerDay', 2, 2],
-  ['callsPerSession', 502.94, 2], ['workDays', 11, 0.5],
-]) {
-  reset();
-  set(id, value);
-  const result = compute();
-  near(demand(result), monthlyDemand * factor);
-  result.frontierResults.forEach((m, i) => {
-    near(m.monthlyFrontierCost, baseline.frontierResults[i].monthlyFrontierCost * factor);
-    assert.equal(m.blended, baseline.frontierResults[i].blended);
-    assert.equal(m.breakeven, baseline.frontierResults[i].breakeven);
-  });
-}
-
-reset();
-set('outputTpsPerUser', 64);
-near(demand(compute()), monthlyDemand);
-assert.equal($('shCostAtUtil').textContent, baselineCost);
-set('outputTpsPerUser', 0);
-near(demand(compute()), monthlyDemand);
-set('totalGoodput', 192000);
-const moreCapacity = compute();
-near(moreCapacity.derivedUtil, baseline.derivedUtil / 2);
-assert.equal($('shCostAtUtil').textContent, baselineCost);
-near(moreCapacity.frontierResults[0].monthlyFrontierCost, baseline.frontierResults[0].monthlyFrontierCost);
-
-reset();
-set('avgOsl', 1000);
-near(demand(compute()), monthlyDemand * 31000 / 32000);
-reset();
-set('cacheHitRate', 0);
-const uncached = compute();
-near(demand(uncached), monthlyDemand);
-assert.equal(uncached.costPerMAt100, baseline.costPerMAt100);
-assert(uncached.frontierResults[0].blended > baseline.frontierResults[0].blended);
-
-for (const reference of references) {
-  reset();
-  set('sessionsPerDay', 0.5);
-  const before = new Map([...elements].map(([id, el]) => [id, el.value]));
-  reference.fire('click');
-  assert.equal($('callsPerSession').value, reference.dataset.callsPerSession);
-  before.forEach((value, id) => { if (id !== 'callsPerSession') assert.equal($(id).value, value); });
-  near(demand(compute()), 200 * 0.5 * Number(reference.dataset.callsPerSession) * 22 * 32000);
-}
-
-const demandInputs = { numUsers: 300, sessionsPerDay: 0.5, callsPerSession: 100, workDays: 20 };
-reset();
-Object.entries(demandInputs).forEach(([id, value]) => set(id, value));
-presets.forEach((preset, i) => {
-  $('presetSelect').value = String(i);
-  $('presetSelect').fire('change');
-  Object.entries(demandInputs).forEach(([id, value]) => assert.equal($(id).value, String(value)));
-  const before = compute();
-  const expected = 300 * 0.5 * 100 * 20 * (preset.values.avgIsl + preset.values.avgOsl);
-  near(demand(before), expected);
-  set('outputTpsPerUser', preset.values.outputTpsPerUser * 2);
-  const after = compute();
-  near(demand(after), expected);
-  after.frontierResults.forEach(m => near(m.monthlyFrontierCost, m.blended * expected / 1e6));
+test('independent financial reference: cost, capacity, blend, bill, breakeven and curve', async t => {
+  const app = await createApp(t);
+  const r = app.calculateScenario(app.defaults, [referenceModel]);
+  assert.equal(r.valid, true);
+  near(r.annualTco, 1113392.64);
+  near(r.monthlyCost, monthlyCost);
+  near(r.annualTotalTokens, 3029529600000);
+  near(r.monthlySupply, 252460800000);
+  near(r.monthlySupply * 12, r.annualTotalTokens);
+  near(r.monthlyDemand, monthlyDemand);
+  near(r.costPerMAt100, 1113392.64 / 3029529.6);
+  near(r.costAtDerivedUtil, monthlyCost / 35406.976);
+  near(r.derivedUtil, monthlyDemand / 252460800000 * 100);
+  near(r.frontierResults[0].blended, 1.900625);
+  near(r.frontierResults[0].monthlyFrontierCost, 35406.976 * 1.900625);
+  near(r.frontierResults[0].breakeven, (1113392.64 / 3029529.6) / 1.900625 * 100);
+  assert.equal(r.selfHostedCosts.length, 100);
+  near(r.selfHostedCosts[0], 1113392.64 / 30295.296);
+  near(r.selfHostedCosts[49], 1113392.64 / 1514764.8);
+  near(r.selfHostedCosts[99], r.costPerMAt100);
 });
-$('presetQuick').children[0].fire('click');
-Object.entries(demandInputs).forEach(([id, value]) => assert.equal($(id).value, String(value)));
 
-reset();
-set('sessionsPerDay', 0.5);
-$('btnPrint').fire('click');
-const print = $('printContent').innerHTML;
-for (const label of ['Sessions / User / Day', 'Avg Model Calls / Session', 'Model Calls / User / Day', 'Monthly API Bill at Estimated Demand']) assert(print.includes(label));
-assert(!/Active Hours|Duty Cycle/.test(print));
-assert($('mathExplanation').innerHTML.includes('Calls/user/day'));
-assert(!/timePerTurn|turnsPerEffHour|activeHrs|dutyCycle/.test(inline));
+test('usage scaling, speed independence, capacity independence and cache-only billing', async t => {
+  const app = await createApp(t);
+  const calc = changes => app.calculateScenario({ ...app.defaults, ...changes }, [referenceModel]);
+  const baseline = calc({});
+  for (const [id, value, factor] of [['numUsers', 400, 2], ['sessionsPerDay', 2, 2], ['callsPerSession', 502.94, 2], ['workDays', 11, 0.5]]) {
+    const r = calc({ [id]: value });
+    near(r.monthlyDemand, monthlyDemand * factor);
+    near(r.frontierResults[0].monthlyFrontierCost, baseline.frontierResults[0].monthlyFrontierCost * factor);
+    near(r.costAtDerivedUtil, baseline.costAtDerivedUtil / factor);
+    assert.equal(r.frontierResults[0].blended, baseline.frontierResults[0].blended);
+    assert.equal(r.frontierResults[0].breakeven, baseline.frontierResults[0].breakeven);
+  }
+  for (const speed of [0, 64]) {
+    const r = calc({ outputTpsPerUser: speed });
+    near(r.monthlyDemand, monthlyDemand);
+    near(r.costAtDerivedUtil, baseline.costAtDerivedUtil);
+  }
+  const capacity = calc({ totalGoodput: 192000 });
+  near(capacity.derivedUtil, baseline.derivedUtil / 2);
+  near(capacity.costPerMAt100, baseline.costPerMAt100 / 2);
+  near(capacity.costAtDerivedUtil, baseline.costAtDerivedUtil);
+  near(capacity.frontierResults[0].monthlyFrontierCost, baseline.frontierResults[0].monthlyFrontierCost);
+  for (const [cacheHitRate, blended] of [[0, 5], [100, 1.4375]]) {
+    const r = calc({ cacheHitRate });
+    near(r.monthlyDemand, monthlyDemand);
+    near(r.monthlySupply, baseline.monthlySupply);
+    near(r.costPerMAt100, baseline.costPerMAt100);
+    near(r.frontierResults[0].blended, blended);
+  }
+  near(calc({ avgOsl: 1000 }).monthlyDemand, 34300508000);
+  near(calc({ avgIsl: 60000 }).monthlyDemand, 68601016000);
+});
 
-for (const id of ['numUsers', 'sessionsPerDay', 'callsPerSession']) {
-  reset();
-  set(id, 0);
-  const result = compute();
-  near(demand(result), 0);
-  assert.equal($('shCostAtUtil').textContent, 'N/A');
-  assert.equal($('annualTco').textContent, '$1,113,393');
-  result.frontierResults.forEach(m => assert.equal(m.monthlyFrontierCost, 0));
-}
+test('zero demand, zero capacity, exact capacity and overload are distinct', async t => {
+  const app = await createApp(t);
+  for (const id of ['numUsers', 'sessionsPerDay', 'callsPerSession']) {
+    const r = app.calculateScenario({ ...app.defaults, [id]: 0 }, [referenceModel]);
+    assert.equal(r.monthlyDemand, 0);
+    assert.equal(r.derivedUtil, 0);
+    assert.equal(r.costAtDerivedUtil, null);
+    near(r.monthlyCost, monthlyCost);
+    assert.equal(r.frontierResults[0].monthlyFrontierCost, 0);
+  }
+  app.set('totalGoodput', 0);
+  let r = app.compute();
+  assert.equal(r.derivedUtil, null);
+  assert.equal(r.costPerMAt100, null);
+  assert.equal(r.costAtDerivedUtil, null);
+  assert.equal(r.frontierResults[0].breakeven, null);
+  assert.match(app.$('derivedUtil').textContent, /no capacity/);
+  assert.match(app.$('shCostAtUtil').textContent, /insufficient capacity/);
+  assert.equal(app.$('shCostPerM').textContent, 'N/A');
+  app.set('totalGoodput', 96000);
+  app.set('sessionsPerDay', 10);
+  r = app.compute();
+  assert(r.derivedUtil > 100);
+  assert.equal(r.costAtDerivedUtil, null);
+  assert.match(app.$('derivedUtil').textContent, /exceeds capacity/);
+  near(r.monthlyDemand, monthlyDemand * 10);
+  const exact = app.calculateScenario({ ...app.defaults, totalGoodput: monthlyDemand / 2629800 }, [referenceModel]);
+  near(exact.derivedUtil, 100);
+  near(exact.costAtDerivedUtil, exact.costPerMAt100);
+});
 
-console.log(`PASS: session demand, API bills, Weka buttons, print view, and ${presets.length} benchmark presets.`);
+test('invalid and overflowing inputs cannot produce financial results', async t => {
+  const app = await createApp(t);
+  for (const [id, value] of [['cacheHitRate', 200], ['cacheHitRate', -1], ['totalGoodput', -1], ['numNodes', 0], ['numNodes', 1.5], ['gpusPerNode', 145], ['costPerNode', -1], ['avgIsl', 0], ['avgOsl', 0], ['numUsers', -1], ['workDays', 32], ['callsPerSession', ''], ['sessionsPerDay', '']]) {
+    app.set(id, value);
+    assert.equal(app.compute().valid, false, id);
+    assert.equal(app.$(id).getAttribute('aria-invalid'), 'true');
+    assert.equal(app.$('shCostAtUtil').textContent, 'N/A');
+    assert.equal(app.$('breakevenBody').children.length, 0);
+    app.set(id, app.defaults[id]);
+    assert.equal(app.compute().valid, true, id);
+  }
+  for (const value of [Infinity, NaN, 1e308]) assert.equal(app.calculateScenario({ ...app.defaults, sessionsPerDay: value }, [referenceModel]).valid, false);
+  app.set('price-0-inputPrice', -1);
+  assert.equal(app.compute().valid, false);
+  app.set('price-0-inputPrice', 0);
+  assert.equal(app.compute().valid, true);
+  const free = app.calculateScenario(app.defaults, [{ ...referenceModel, inputPrice: 0, cachedPrice: 0, outputPrice: 0 }]);
+  assert.equal(free.frontierResults[0].breakeven, Infinity);
+  assert.equal(free.frontierResults[0].monthlyFrontierCost, 0);
+});
+
+test('both pinned Weka references change only calls/session', async t => {
+  const app = await createApp(t);
+  const buttons = [...app.window.document.querySelectorAll('[data-calls-per-session]')];
+  assert.deepEqual(buttons.map(b => b.dataset.callsPerSession), ['251.47', '173.70']);
+  app.set('sessionsPerDay', 0.5);
+  for (const [index, expected] of [251.47, 173.70].entries()) {
+    const before = [...app.window.document.querySelectorAll('input, select, textarea')].map(el => [el, el.value]);
+    buttons[index].click();
+    assert.equal(Number(app.$('callsPerSession').value), expected);
+    for (const [el, value] of before) if (el.id !== 'callsPerSession') assert.equal(el.value, value, el.id);
+    near(app.compute().monthlyDemand, 200 * 0.5 * expected * 22 * 32000);
+  }
+});
+
+test('every preset maps all benchmark fields and preserves edited demand inputs', async t => {
+  const app = await createApp(t);
+  assert.equal(app.presets.length, 23);
+  const demand = { numUsers: 300, sessionsPerDay: 0.5, callsPerSession: 100, workDays: 20 };
+  Object.entries(demand).forEach(([id, value]) => app.set(id, value));
+  const verify = preset => {
+    for (const [id, value] of Object.entries({ ...preset.values, ...demand })) assert.equal(app.$(id).value, String(value), `${preset.id}: ${id}`);
+    assert.equal(app.$('hfSearch').value, preset.source.model);
+    assert.equal(app.$('scenarioName').value, preset.label);
+    assert(app.$('presetProvenance').classList.contains('open'));
+    const r = app.compute();
+    near(r.monthlyDemand, 300000 * (preset.values.avgIsl + preset.values.avgOsl));
+    near(r.monthlyCost, preset.values.numNodes * preset.values.costPerNode);
+    near(r.monthlySupply, preset.values.totalGoodput * 2629800);
+    r.frontierResults.forEach(m => near(m.monthlyFrontierCost, m.blended * r.monthlyDemand / 1e6));
+  };
+  app.presets.forEach((preset, i) => { app.preset(i); verify(preset); });
+  const buttons = [...app.$('presetQuick').querySelectorAll('button')];
+  assert.equal(buttons.length, 3);
+  buttons.forEach(button => { button.click(); verify(app.presets.find(p => p.id === button.dataset.presetId)); });
+});
+
+test('benchmark edits clear measured attribution; demand edits preserve it', async t => {
+  const app = await createApp(t);
+  app.preset(0);
+  app.set('numUsers', 250);
+  assert.equal(app.$('presetSelect').value, '0');
+  for (const id of Object.keys(app.presets[0].values)) {
+    app.preset(0);
+    app.set(id, id === 'gpuType' ? 'Custom GPU' : Number(app.$(id).value) + 1);
+    assert.equal(app.$('presetSelect').value, 'custom', id);
+    assert(!app.$('presetProvenance').classList.contains('open'));
+    assert.match(app.$('scenarioName').value, /^Custom/);
+  }
+});
+
+test('real DOM pricing edits, accordion state and checkbox selection affect outputs', async t => {
+  const app = await createApp(t);
+  const doc = app.window.document;
+  assert.equal(doc.querySelectorAll('.frontier-prices input').length, app.models.length * 3);
+  const expand = doc.querySelector('.frontier-expand');
+  expand.click();
+  assert.equal(expand.getAttribute('aria-expanded'), 'true');
+  for (const [field, value] of Object.entries({ inputPrice: 4, cachedPrice: 0.2, outputPrice: 20 })) app.set(`price-0-${field}`, value);
+  near(app.compute().frontierResults[0].blended, 1.900625);
+  app.set('price-0-cachedPrice', 1);
+  near(app.compute().frontierResults[0].blended, 2.553125);
+  assert.equal(app.$('blended-0').textContent, `$${(2.553125).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/M`);
+  const checkboxes = [...doc.querySelectorAll('.frontier-list input[type="checkbox"]')];
+  assert.equal(checkboxes.length, app.models.length);
+  checkboxes.forEach(cb => { if (cb.checked) cb.click(); });
+  assert.equal(app.compute().frontierResults.length, 0);
+  assert.equal(app.$('breakevenBody').children.length, 0);
+  checkboxes[0].click();
+  assert.equal(app.compute().frontierResults.length, 1);
+  assert.equal(app.$('breakevenBody').children.length, 1);
+});
+
+test('native print regenerates current values, including zero demand and invalid input', async t => {
+  const app = await createApp(t);
+  const print = () => app.window.dispatchEvent(new app.window.Event('beforeprint'));
+  print();
+  assert(app.$('printContent').textContent.includes('Monthly API Bill at Estimated Demand'));
+  assert(!app.$('printOverlay').classList.contains('active'));
+  app.set('numUsers', 0);
+  print();
+  assert.equal(app.$('shCostAtUtil').textContent, 'N/A');
+  assert(app.$('printContent').textContent.includes('N/A/M tokens'));
+  app.$('scenarioName').value = '<script>test</script>';
+  app.$('btnPrint').click();
+  assert.equal(app.$('printContent').querySelectorAll('script').length, 0);
+  assert(app.$('printOverlay').classList.contains('active'));
+  app.set('cacheHitRate', 200);
+  print();
+  assert.match(app.$('printContent').textContent, /between 0 and 100/);
+});
+
+test('initial snapshot works during a pending request and live updates preserve user edits', async t => {
+  let resolve;
+  const app = await createApp(t, { fetch: () => new Promise(r => { resolve = r; }) });
+  assert.notEqual(app.$('annualTco').textContent, '—');
+  assert(app.$('breakevenBody').children.length > 0);
+  app.set('price-0-inputPrice', 7);
+  app.window.document.querySelector('.frontier-list input[type="checkbox"]').click();
+  resolve({ ok: true, json: async () => ({ data: app.models.map(m => ({ id: m.id, pricing: { prompt: '0.000010', completion: '0.000020' } })) }) });
+  await flush();
+  assert.equal(app.getModels()[0].inputPrice, 7);
+  assert.equal(app.getModels()[0].checked, false);
+  assert.equal(app.getModels()[0].cachedPrice, 10);
+  assert.match(app.$('frontierLoading').textContent, /missing cache prices use input rates/);
+});
+
+test('failed, malformed, partial and timed-out API responses keep usable snapshot output', async t => {
+  for (const [name, fetch] of [
+    ['network', async () => { throw new Error('offline'); }],
+    ['HTTP', async () => ({ ok: false, status: 503 })],
+    ['JSON', async () => ({ ok: true, json: async () => { throw new Error('invalid JSON'); } })],
+    ['schema', async () => ({ ok: true, json: async () => ({ error: 'bad schema' }) })],
+  ]) await t.test(name, async t => {
+    const app = await createApp(t, { fetch });
+    assert.match(app.$('frontierLoading').textContent, /unavailable.*snapshot/);
+    assert(app.$('breakevenBody').children.length > 0);
+    assert.equal(app.warnings.length, 1);
+  });
+  const app = await createApp(t);
+  const resolved = app.resolveFrontierPricing({ data: [{ id: app.models[0].id, pricing: { prompt: '0.000010', completion: '0.000020' } }] });
+  assert.equal(resolved.models[0].cachedPrice, 10);
+  assert.equal(resolved.models[0].inputPrice, 10);
+  assert.equal(resolved.snapshotCount, app.models.length - 1);
+  let signal;
+  app.window.fetch = (url, options) => { signal = options.signal; return new Promise(() => {}); };
+  await assert.rejects(app.fetchJSON('https://example.test', 5), /timed out/);
+  assert.equal(signal.aborted, true);
+});
+
+test('missing Chart.js leaves the numerical comparison and print view usable', async t => {
+  const app = await createApp(t, { chart: false });
+  assert.equal(app.$('chartStatus').hidden, false);
+  assert(app.$('breakevenBody').children.length > 0);
+  app.$('btnPrint').click();
+  assert.match(app.$('printContent').textContent, /Chart unavailable/);
+});
+
+test('model search uses real events and ignores stale responses', async t => {
+  const app = await createApp(t);
+  app.preset(0);
+  const responses = [];
+  app.window.fetch = () => new Promise(resolve => responses.push(resolve));
+  const old = app.searchHF('old');
+  const current = app.searchHF('current');
+  responses[1]({ ok: true, json: async () => [{ id: 'org/current-model', downloads: 100 }] });
+  await current;
+  responses[0]({ ok: true, json: async () => [{ id: 'org/old-model' }] });
+  await old;
+  assert.match(app.$('hfResults').textContent, /current-model/);
+  assert.doesNotMatch(app.$('hfResults').textContent, /old-model/);
+  app.$('hfResults').firstElementChild.click();
+  assert.equal(app.$('hfSearch').value, 'org/current-model');
+  assert.equal(app.$('presetSelect').value, 'custom');
+  app.set('hfSearch', 'x'); // Exercise the actual input listener and its timer APIs.
+  assert(!app.$('hfResults').classList.contains('open'));
+});
