@@ -2,14 +2,13 @@
 /**
  * Refresh the scenario preset snapshot in index.html from the InferenceX API.
  *
- * For each curated (model, hardware) pair below, picks the best measured
- * agentic-traces run on a vLLM- or SGLang-family serving stack (vllm,
- * dynamo-vllm, llmd-vllm, vllm-disagg, sglang, dynamo-sglang) — latest
- * date, then highest output throughput among runs meeting an interactivity
- * floor — and derives the calculator's serving-side inputs from that run:
+ * For each curated (model, hardware) pair below, picks an operating point
+ * from that configuration's Pareto curve of agentic-traces runs on a vLLM-
+ * or SGLang-family serving stack: the highest-throughput frontier point
+ * whose median per-user interactivity still meets a 35 tok/s target.
  *
- *   - prefill goodput   = input_tput_tps          (raw: cache hits included)
- *   - output goodput    = output_tput_tps         (fleet total)
+ *   - total goodput    = total_tput_tps          (input + output tokens/s,
+ *                          cache hits included — used directly as capacity)
  *   - cache hit rate    = server_gpu_cache_hit_rate (measured, same run)
  *   - ISL / OSL         = mean_input_tokens / mean_output_tokens_actual
  *   - tok/s per user    = median_intvty
@@ -40,6 +39,13 @@ const END_MARKER = '  // END SCENARIO_PRESETS';
 
 /** Minimum median interactivity (tok/s per session) for a usable preset. */
 const INTERACTIVITY_FLOOR = 20;
+/**
+ * Per-user interactivity target for operating-point selection. Among the
+ * Pareto frontier of a model's runs, the preset takes the highest-throughput
+ * point whose median interactivity still meets this target (InferenceX's own
+ * calculator defaults to the same number).
+ */
+const INTERACTIVITY_TARGET = 35;
 /** Hours per month used to convert $/GPU-hr into $/node/month. */
 const HOURS_PER_MONTH = 730;
 
@@ -124,8 +130,7 @@ function eligible(row) {
   const num = v => Number.isFinite(v) && v > 0;
   return (
     row.benchmark_type === 'agentic_traces' &&
-    num(m.input_tput_tps) &&
-    num(m.output_tput_tps) &&
+    num(m.total_tput_tps) &&
     num(m.mean_input_tokens) &&
     num(m.mean_output_tokens_actual) &&
     num(m.median_intvty) &&
@@ -156,18 +161,9 @@ function buildPreset(entry, row, hardwareInfo, nodeSize) {
 
   const isl = Math.round(m.mean_input_tokens);
   const osl = Math.round(m.mean_output_tokens_actual);
-  const inputTps = Math.round(m.input_tput_tps);
-  const outputTps = Math.round(m.output_tput_tps);
+  const totalGoodput = Math.round(m.total_tput_tps);
   const perUser = round(m.median_intvty, 1);
   const hit = round(hitRate(row) * 100, 1);
-
-  // Same capacity math as the app: prefill goodput is raw (cache hits
-  // included), so the prefill limit divides by the input fraction.
-  const inputFrac = isl / (isl + osl);
-  const outputFrac = osl / (isl + osl);
-  const decodeLimit = outputTps / outputFrac;
-  const prefillLimit = inputTps / inputFrac;
-  const sustained = Math.min(decodeLimit, prefillLimit);
 
   const hwLabel = hardwareInfo.label;
   const short = `${entry.model} ${hwLabel.replace(/ NVL72| SXM/g, '')}`;
@@ -200,14 +196,37 @@ function buildPreset(entry, row, hardwareInfo, nodeSize) {
       cacheHitRate: hit,
       avgIsl: isl,
       avgOsl: osl,
-      inputTps,
-      outputTps,
+      totalGoodput,
       outputTpsPerUser: perUser,
     },
-    // Dry-run diagnostics (not written to index.html).
-    _sustained: sustained,
-    _binding: decodeLimit <= prefillLimit ? 'decode' : 'prefill',
   };
+}
+
+/**
+ * Pareto frontier of runs on the (total throughput, interactivity) plane.
+ * A point is kept unless another point matches or beats it on both axes and
+ * strictly beats it on at least one.
+ */
+function paretoFrontier(rows) {
+  const pts = rows.map(r => ({ row: r, t: r.metrics.total_tput_tps, i: r.metrics.median_intvty }));
+  return pts
+    .filter(a => !pts.some(b => b !== a && b.t >= a.t && b.i >= a.i && (b.t > a.t || b.i > a.i)))
+    .map(p => p.row);
+}
+
+/** Pick the operating point: max-throughput frontier point meeting the
+ *  interactivity target; if the whole frontier is slower than the target,
+ *  fall back to the most interactive frontier point. Newest date breaks ties. */
+function pickOperatingPoint(rows) {
+  const frontier = paretoFrontier(rows);
+  const onTarget = frontier.filter(r => r.metrics.median_intvty >= INTERACTIVITY_TARGET);
+  const pool = onTarget.length ? onTarget : [...frontier].sort((a, b) => b.metrics.median_intvty - a.metrics.median_intvty);
+  return pool.sort(
+    (a, b) =>
+      (b.metrics.total_tput_tps - a.metrics.total_tput_tps) ||
+      ((b.date > a.date) - (a.date > b.date)) ||
+      (b.metrics.median_intvty - a.metrics.median_intvty)
+  )[0];
 }
 
 function renderBlock(presets, today) {
@@ -217,7 +236,7 @@ function renderBlock(presets, today) {
     return [
       `    { id: ${quote(p.id)}, label: ${quote(p.label)}, short: ${quote(p.short)}, featured: ${p.featured ? 'true' : 'false'},`,
       `      source: { model: ${quote(src.model)}, hardware: ${quote(src.hardware)}, framework: ${quote(src.framework)}, precision: ${quote(src.precision)}, disagg: ${src.disagg}, concurrency: ${src.concurrency}, date: ${quote(src.date)}, runUrl: ${quote(src.runUrl)}, gpuHourRate: ${src.gpuHourRate} },`,
-      `      values: { gpuType: ${quote(v.gpuType)}, gpusPerNode: ${v.gpusPerNode}, numNodes: ${v.numNodes}, costPerNode: ${v.costPerNode}, concurrency: ${v.concurrency}, cacheHitRate: ${v.cacheHitRate}, avgIsl: ${v.avgIsl}, avgOsl: ${v.avgOsl}, inputTps: ${v.inputTps}, outputTps: ${v.outputTps}, outputTpsPerUser: ${v.outputTpsPerUser} } },`,
+      `      values: { gpuType: ${quote(v.gpuType)}, gpusPerNode: ${v.gpusPerNode}, numNodes: ${v.numNodes}, costPerNode: ${v.costPerNode}, concurrency: ${v.concurrency}, cacheHitRate: ${v.cacheHitRate}, avgIsl: ${v.avgIsl}, avgOsl: ${v.avgOsl}, totalGoodput: ${v.totalGoodput}, outputTpsPerUser: ${v.outputTpsPerUser} } },`,
     ].join('\n');
   });
 
@@ -226,8 +245,9 @@ function renderBlock(presets, today) {
     `  // Snapshot: ${today}`,
     '  // Generated by scripts/refresh-presets.mjs from https://inferencex.semianalysis.com.',
     '  // Each preset is a measured agentic-traces operating point from a single InferenceX',
-    '  // benchmark run on a vLLM- or SGLang-family stack (latest date, best throughput',
-    '  // meeting an interactivity floor). Demand-estimate inputs are left at the repo defaults.',
+    '  // benchmark run on a vLLM- or SGLang-family stack. Selection: the highest-throughput',
+    '  // Pareto frontier point meeting a 35 tok/s per-user interactivity target.',
+    '  // Demand-estimate inputs are left at the repo defaults.',
     '  const SCENARIO_PRESETS = [',
     ...lines,
     '  ];',
@@ -282,8 +302,7 @@ async function main() {
       fail(`no valid vLLM/SGLang agentic-traces run for ${entry.model} on ${entry.hardware}. Update CURATED in scripts/refresh-presets.mjs.`);
     }
 
-    rows.sort((a, b) => (b.date > a.date) - (b.date < a.date) || (b.metrics.output_tput_tps || 0) - (a.metrics.output_tput_tps || 0));
-    const row = rows[0];
+    const row = pickOperatingPoint(rows);
 
     const chip = chipFor(chips, entry.hardware);
     const nodeSize = Number(chip?.scaleUpWorldSize) || 8;
@@ -300,8 +319,8 @@ async function main() {
   console.log(`Scenario preset snapshot (${today})`);
   for (const p of presets) {
     console.log(
-      `  ${p.label.padEnd(34)} ${String(p.source.concurrency).padStart(5)} conc  ` +
-      `${Math.round(p._sustained).toLocaleString('en-US').padStart(10)} tok/s (${p._binding}-bound)  ` +
+      `  ${p.label.padEnd(50)} ${String(p.source.concurrency).padStart(5)} conc  ` +
+      `${p.values.totalGoodput.toLocaleString('en-US').padStart(11)} tok/s  ` +
       `hit ${String(p.values.cacheHitRate).padStart(4)}%  ${p.source.date}`
     );
   }

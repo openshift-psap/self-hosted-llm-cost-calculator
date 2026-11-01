@@ -21,21 +21,17 @@ Key features:
 
 ### Self-hosted cost per million tokens
 
-Decode and prefill are modeled as separate serving resources (as in a disaggregated stack). Token fractions come from the workload's ISL:OSL mix and cache hit rate.
+Capacity is the fleet's **measured total token throughput** — input + output tokens combined, cache hits included — under the workload's latency SLOs. This is exactly what benchmarks report (InferenceX `total_tput_tps`, AIPerf `total_token_throughput`), so there is no derivation: the number you measured is the number the calculator uses.
 
 ```
-decode_limit   = output_goodput_tps / output_frac
-prefill_limit  = prefill_goodput_tps / input_frac
-sustained_tps  = min(decode_limit, prefill_limit)
-
-cost/M = Annual TCO / (sustained_tps × seconds_per_year / 1e6)
+cost/M = Annual TCO / (total_goodput_tps × seconds_per_year / 1e6)
 ```
 
 At utilization U%: `cost/M = cost_at_100% / (U / 100)`
 
 The cost is the same for all token types because every token — whether prefill (cached or uncached) or decode — consumes compute from the same fixed hardware pool.
 
-Prefill goodput is the **raw figure benchmarks report**: all input tokens per second, cache hits included (InferenceX `input_tput_tps`, AIPerf `total_isl / duration`, and vLLM-style aggregate input throughput all work). The capacity model divides it by the input fraction, which is equivalent to deriving uncached prefill capacity (`raw × (1 − hit rate)`) and measuring it against the uncached fraction — the hit rate cancels. Cache hit rate therefore affects only the frontier billing blend, not self-hosted capacity: to model a self-hosted caching improvement, benchmark it and update the goodput inputs.
+Goodput is workload-specific: it was measured serving a particular mix (ISL:OSL, cache behavior) at a particular latency target. If you change the workload, re-benchmark rather than extrapolate — the calculator deliberately does not infer capacity changes from mix edits. Cache hit rate affects only the frontier billing blend, not self-hosted capacity.
 
 ### Frontier blended cost per million tokens
 
@@ -55,15 +51,14 @@ The defaults model an agentic coding workload served by [llm-d](https://github.c
 |---|---|---|
 | GPU nodes | 8 (8xH200 each) | IBM Cloud |
 | Cost/node/month | $11,597.84 | IBM Cloud public pricing |
-| Output goodput (decode) | 6,000 tok/s | aiperf benchmark (InferenceX CC-Traces Weka, c=128) |
-| Prefill goodput (incl. cached) | 100,000 tok/s | aiperf benchmark — 13,000 uncached tok/s at the 87% cache hit rate, expressed as the raw figure benchmarks report |
+| Total goodput | 96,000 tok/s | aiperf benchmark (InferenceX CC-Traces Weka, c=128): 6,000 output tok/s at the workload's 15:1 mix |
 | Cache hit rate | 87% | Multi-turn agentic session prefix reuse |
 | Avg ISL | 30,000 tokens | Weka trace dataset |
 | Avg OSL | 2,000 tokens | Weka trace dataset |
 
-> Note: prefill goodput counts **all** input tokens, cache hits included — the
-> same convention as InferenceX `input_tput_tps` and AIPerf's client-side
-> input throughput. The capacity model adjusts for caching internally.
+> Note: total goodput counts **all** tokens — input (cache hits included) plus
+> output — the same convention as InferenceX `total_tput_tps` and AIPerf's
+> total token throughput.
 
 ## Scenario presets
 
@@ -81,8 +76,7 @@ fields from one benchmark run:
 |---|---|
 | GPU type, GPUs per node, nodes | run topology + gpu-specs `scaleUpWorldSize` |
 | $/node/month | hardware catalog rental `$/GPU-hr × 730 × GPUs/node` — see note below |
-| Prefill goodput (incl. cached) | `input_tput_tps` |
-| Output goodput | `output_tput_tps` |
+| Total goodput | `total_tput_tps` (measured, input + output) |
 | Cache hit rate | `server_gpu_cache_hit_rate` (measured, same run) |
 | Avg ISL / OSL | `mean_input_tokens` / `mean_output_tokens_actual` (full prompt) |
 | Output tok/s per user | `median_intvty` |
@@ -108,10 +102,13 @@ node scripts/refresh-presets.mjs --write  # update index.html
 node scripts/refresh-presets.mjs --check  # fail if the snapshot is stale
 ```
 
-The script picks, per curated model × hardware pair, the latest vLLM- or
-SGLang-family run with the highest output throughput among runs meeting a
-20 tok/s interactivity floor. Edit the `CURATED` list in the script to change
-the catalog.
+The script picks, per curated model × hardware pair, an operating point from
+that configuration's Pareto curve: the **highest-throughput frontier point
+whose median per-user interactivity still meets a 35 tok/s target** (the same
+default InferenceX's own calculator uses). Runs at higher concurrency trade
+per-user streaming speed for total throughput; the target keeps presets on
+the efficient frontier at a usable interactivity. Edit `CURATED` to change
+the catalog or `INTERACTIVITY_TARGET` to change the operating point.
 
 ## Frontier pricing snapshot
 
