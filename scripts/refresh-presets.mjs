@@ -14,8 +14,8 @@
  *   - tok/s per user    = median_intvty
  *   - $/node/month      = rental $/GPU-hr x 730 x GPUs per node
  *
- * Demand-estimate inputs (users, active hours, duty cycle, working days) are
- * deliberately NOT set by presets — they stay at the repo defaults.
+ * Demand-estimate inputs (users, sessions/day, calls/session, working days)
+ * are deliberately NOT set by presets — they retain the user's values.
  *
  * The InferenceX API does not send CORS headers, so presets are baked into
  * index.html as a snapshot (same pattern as the frontier pricing snapshot).

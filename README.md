@@ -14,7 +14,7 @@ Key features:
 - **Scenario presets** — measured operating points from [InferenceX](https://inferencex.semianalysis.com) agentic-traces benchmark runs (model × hardware, with provenance links), quick-select buttons for the top three
 - **HuggingFace model search** for labeling the self-hosted model
 - **Workload-aware blended cost** — accounts for the ISL:OSL token mix and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
-- **Two-resource capacity model** — decode and prefill goodput are separate capacity limits; sustained throughput is whichever the workload mix binds first
+- **Measured capacity** — uses the fleet's measured total goodput directly, without extrapolating prefill/decode performance
 - **Single self-hosted cost** — unlike frontier APIs that charge differently per token type, self-hosted infrastructure has one fixed cost regardless of whether tokens are input, cached, or output
 
 ## Cost methodology
@@ -42,6 +42,38 @@ blended/M = uncached_input_frac × input_price
 ```
 
 Where fractions are derived from the workload's ISL:OSL token mix and the cache hit rate — matching how frontier APIs bill, since cached input tokens are charged at the (cheaper) cached rate rather than being free. This matters because agentic workloads with high cache hit rates (e.g., 87% for multi-turn sessions) dramatically reduce the effective frontier cost — a naive comparison using list prices overstates the frontier cost.
+
+The monthly API bill uses this blended price at the estimated monthly demand;
+the blended $/M price itself does not change with demand.
+
+### Demand estimate
+
+```
+calls/user/day = sessions/user/day × average model calls/session
+monthly demand = users × working days × calls/user/day × (Avg ISL + Avg OSL)
+average utilization = monthly demand / (total goodput × seconds/month)
+```
+
+Demand no longer depends on generation speed. A session may contain multiple
+tasks; model calls include both the main agent and its subagents. Full prompt
+tokens, including cached input, are counted on every call.
+
+Sessions/user/day defaults to **1**, an editable usage assumption, not a trace
+measurement. Calls/session defaults to **251.47**, the mean of 98,827 model
+calls across 393 sessions in the
+[June 21 full-context Weka corpus](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126).
+A quick-select button also supplies **173.70**, the mean of 68,266 calls across
+393 sessions in the
+[256k-capped corpus](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k).
+Both values are editable and include subagent calls. These filtered coding
+traces favour longer sessions; they do not establish tasks or sessions per
+user per day. Use the corpus matching your workload, or your own measurements.
+Choosing a calls/session reference changes only that demand input, not the
+benchmark's ISL/OSL, cache rate, or goodput.
+
+Average utilization covers the entire calendar month, including idle hours;
+it is not a peak-capacity guarantee. Cost per consumed token is N/A at zero
+demand, although the fixed fleet bill remains payable.
 
 ## Default parameters
 
@@ -89,9 +121,10 @@ fields from one benchmark run:
 > For example, H200 at $2.90/GPU-hr rental × 730 h × 8 GPUs/node = $16,936 per
 > node-month. The derivation is shown in each preset's provenance caption.
 
-Demand-estimate inputs (number of users, active hours, duty cycle, working
-days) are deliberately **not** touched by presets — they stay at the repo
-defaults, since no benchmark can supply them.
+Demand-estimate inputs (number of users, sessions/user/day, calls/session,
+working days) are deliberately **not** touched by benchmark presets — they
+retain the user's current values. Corpus call counts are selected separately
+from infrastructure presets; presets do not establish daily user activity.
 
 The InferenceX API does not send CORS headers, so presets are baked into
 `index.html` as a snapshot between `BEGIN/END SCENARIO_PRESETS` markers:
@@ -160,6 +193,9 @@ live-site verification workflow.
 ## Tech stack
 
 Single HTML file, no build step. Uses Chart.js 4.x from CDN, vanilla JavaScript, and browser `fetch()` for API calls (OpenRouter and HuggingFace support CORS; InferenceX does not, so presets are baked as a snapshot). The pricing and preset refresh scripts are maintenance tools only; they are not part of the deployed page.
+
+Run `node scripts/test-calculations.mjs` for offline calculation and DOM-shim
+interaction checks, including demand, monthly API bills, presets, and printing.
 
 ## License
 

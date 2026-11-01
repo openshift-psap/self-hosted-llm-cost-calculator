@@ -242,6 +242,25 @@
     gap: 6px;
   }
 
+  .demand-note {
+    font-size: 9px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 4px 0 8px;
+  }
+  .demand-note a { color: var(--cat-1); }
+  .demand-reference {
+    padding: 2px 5px;
+    margin: 3px 2px 0 0;
+    font: inherit;
+    color: var(--cat-1);
+    background: var(--page-plane);
+    border: 1px solid var(--baseline);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .demand-reference:hover { border-color: var(--cat-1); }
+
   .computed-box {
     background: var(--page-plane);
     border: 1px solid var(--gridline);
@@ -604,23 +623,34 @@
       <div class="section-label">Demand Estimate</div>
       <div class="field-row">
         <div class="field">
-          <label>Number of users</label>
-          <input type="number" id="numUsers" value="200" min="1" step="10">
+          <label for="numUsers">Number of users</label>
+          <input type="number" id="numUsers" value="200" min="0" step="10">
         </div>
         <div class="field">
-          <label>Active hours / day</label>
-          <input type="number" id="activeHrs" value="8" min="0.5" max="24" step="0.5">
+          <label for="sessionsPerDay">Sessions / user / day</label>
+          <input type="number" id="sessionsPerDay" value="1" min="0" step="0.1">
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <label>Duty cycle (% of active time generating tokens)</label>
-          <input type="number" id="dutyCycle" value="30" min="1" max="100" step="5">
+          <label for="callsPerSession">Avg model calls / session</label>
+          <input type="number" id="callsPerSession" value="251.47" min="0" step="0.01">
         </div>
         <div class="field">
-          <label>Working days / month</label>
+          <label for="workDays">Working days / month</label>
           <input type="number" id="workDays" value="22" min="1" max="31" step="1">
         </div>
+      </div>
+
+      <div class="demand-note">
+        Sessions/day is your usage assumption, not measured by Weka. A session may contain several tasks.
+        Calls/session includes main-agent and subagent calls.<br>
+        Weka June 21 means (393 sessions):
+        <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
+        <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button><br>
+        Sources: <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
+        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>.
+        These filtered coding traces favour longer sessions. Choose the matching corpus or edit the estimate; benchmark presets do not change it.
       </div>
 
       <div class="computed-box">
@@ -629,6 +659,7 @@
           Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
         </div>
         <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
+          <div>Model calls / user / day: <span class="val" id="dailyCallsPerUser">—</span></div>
           <div>Monthly token demand: <span class="val" id="monthlyDemand">—</span></div>
           <div>Avg utilization: <span class="val" id="derivedUtil" style="font-size: 13px;">—</span> &nbsp; Self-hosted cost: <span class="val" id="shCostAtUtil" style="font-size: 13px;">—</span>/M</div>
         </div>
@@ -662,7 +693,7 @@
             <th>Frontier Model</th>
             <th>Blended $/M</th>
             <th>Breakeven Util.</th>
-            <th>Monthly Frontier Cost at Self-Hosted Volume</th>
+            <th>Monthly API Bill at Estimated Demand</th>
           </tr>
         </thead>
         <tbody id="breakevenBody"></tbody>
@@ -1059,9 +1090,9 @@
     // Billing mix: providers charge per token delivered (cached input bills at
     // the cached rate, not $0), so the blend weights come from the workload's
     // token composition (ISL:OSL) split by cache hit rate.
-    const turnTokens = avgIsl + avgOsl;
-    const inputFrac = turnTokens > 0 ? avgIsl / turnTokens : 0;
-    const outputFrac = turnTokens > 0 ? avgOsl / turnTokens : 0;
+    const tokensPerCall = avgIsl + avgOsl;
+    const inputFrac = tokensPerCall > 0 ? avgIsl / tokensPerCall : 0;
+    const outputFrac = tokensPerCall > 0 ? avgOsl / tokensPerCall : 0;
     const cachedFrac = inputFrac * cacheHitPct;
     const uncachedFrac = inputFrac * (1 - cacheHitPct);
 
@@ -1082,16 +1113,14 @@
 
     // --- Demand estimate ---
     const numUsers = val('numUsers');
-    const activeHrs = val('activeHrs');
-    const dutyCyclePct = val('dutyCycle') / 100;
+    const sessionsPerDay = val('sessionsPerDay');
+    const callsPerSession = val('callsPerSession');
     const workDays = val('workDays');
-    const outputPerUser = val('outputTpsPerUser');
 
-    const tokensPerTurn = avgIsl + avgOsl;
-    const timePerTurn = outputPerUser > 0 ? avgOsl / outputPerUser : 0;
-    const turnsPerEffHour = timePerTurn > 0 ? 3600 / timePerTurn : 0;
-    const effHoursPerUserMo = activeHrs * dutyCyclePct * workDays;
-    const tokensPerUserMo = turnsPerEffHour * tokensPerTurn * effHoursPerUserMo;
+    // Usage is independent of streaming speed. Calls include the session's
+    // main-agent and subagent requests; ISL includes cached prompt tokens.
+    const callsPerUserDay = sessionsPerDay * callsPerSession;
+    const tokensPerUserMo = callsPerUserDay * workDays * tokensPerCall;
     const monthlyDemand = numUsers * tokensPerUserMo;
 
     const SECS_PER_MONTH = 30.44 * 86400;
@@ -1102,9 +1131,12 @@
 
     // Update demand display
     const demandB = (monthlyDemand / 1e9).toFixed(1);
+    $('dailyCallsPerUser').textContent = fmt(callsPerUserDay);
     $('monthlyDemand').textContent = `${demandB}B tokens/month`;
     $('derivedUtil').textContent = fmt(derivedUtil, 1) + '%';
-    $('shCostAtUtil').textContent = '$' + fmt(derivedUtil > 100 ? costPerMAt100 : costAtDerivedUtil, 2);
+    $('shCostAtUtil').textContent = monthlyDemand > 0
+      ? '$' + fmt(derivedUtil > 100 ? costPerMAt100 : costAtDerivedUtil, 2)
+      : 'N/A';
 
     if (derivedUtil > 100) {
       $('derivedUtil').style.color = '#e34948';
@@ -1124,14 +1156,13 @@
       `&bull; Annual tokens = ${fmt(totalGoodput, 0)} &times; ${fmt(SECS_PER_YEAR, 0)} = <strong>${annualTokensB}B</strong><br>` +
       `&bull; Cost/M at 100% = ${fmtDollar(annualTco)} &divide; ${annualTokensB}B &times; 10<sup>6</sup> = <strong>$${fmt(costPerMAt100, 2)}/M</strong><br><br>` +
       `<strong>Utilization derivation:</strong><br>` +
-      `&bull; Tokens/turn = ${fmt(avgIsl, 0)} ISL + ${fmt(avgOsl, 0)} OSL = <strong>${fmt(tokensPerTurn, 0)}</strong><br>` +
-      `&bull; Time/turn = ${fmt(avgOsl, 0)} OSL &divide; ${fmt(outputPerUser, 0)} tok/s/user = <strong>${fmt(timePerTurn, 1)}s</strong><br>` +
-      `&bull; Turns/eff-hour = 3600 &divide; ${fmt(timePerTurn, 1)} = <strong>${fmt(turnsPerEffHour, 1)}</strong><br>` +
-      `&bull; Eff hours/user/mo = ${fmt(activeHrs, 1)}h &times; ${fmt(dutyCyclePct * 100, 0)}% &times; ${fmt(workDays, 0)}d = <strong>${fmt(effHoursPerUserMo, 1)}h</strong><br>` +
-      `&bull; Tokens/user/mo = ${fmt(turnsPerEffHour, 1)} &times; ${fmt(tokensPerTurn, 0)} &times; ${fmt(effHoursPerUserMo, 1)} = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
+      `&bull; Tokens/call = ${fmt(avgIsl, 0)} ISL + ${fmt(avgOsl, 0)} OSL = <strong>${fmt(tokensPerCall, 0)}</strong> (cached input included)<br>` +
+      `&bull; Calls/user/day = ${fmt(sessionsPerDay)} sessions &times; ${fmt(callsPerSession)} calls/session = <strong>${fmt(callsPerUserDay)}</strong><br>` +
+      `&bull; Tokens/user/mo = ${fmt(callsPerUserDay)} calls/day &times; ${fmt(workDays, 0)} days &times; ${fmt(tokensPerCall, 0)} tokens/call = <strong>${(tokensPerUserMo / 1e6).toFixed(1)}M</strong><br>` +
       `&bull; Monthly demand = ${fmt(numUsers, 0)} users &times; ${(tokensPerUserMo / 1e6).toFixed(1)}M = <strong>${demandB}B tokens</strong><br>` +
       `&bull; Monthly supply = ${fmt(totalGoodput, 0)} tok/s &times; ${fmt(SECS_PER_MONTH, 0)}s = <strong>${(monthlySupply / 1e9).toFixed(1)}B tokens</strong><br>` +
-      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong>`;
+      `&bull; Avg utilization = ${demandB}B &divide; ${(monthlySupply / 1e9).toFixed(1)}B = <strong>${fmt(derivedUtil, 1)}%</strong><br>` +
+      `Streaming speed does not change demand. Utilization is a calendar-month average, not a peak-capacity check.`;
 
     // Self-hosted curve
     const utilizations = [];
@@ -1171,8 +1202,7 @@
 
       const breakeven = blended > 0 ? (costPerMAt100 / blended) * 100 : Infinity;
 
-      const monthlyTokensAt25 = annualTotalTokens * 0.25 / 12;
-      const monthlyFrontierCost = blended * (monthlyTokensAt25 / 1e6);
+      const monthlyFrontierCost = blended * (monthlyDemand / 1e6);
 
       return { ...m, blended, breakeven, monthlyFrontierCost };
     });
@@ -1371,8 +1401,15 @@
   }
 
   // --- Wire up inputs ---
-  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #totalGoodput, #outputTpsPerUser, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #numUsers, #activeHrs, #dutyCycle, #workDays').forEach(inp => {
+  document.querySelectorAll('#gpuType, #gpusPerNode, #numNodes, #costPerNode, #totalGoodput, #outputTpsPerUser, #cacheHitRate, #concurrency, #avgIsl, #avgOsl, #numUsers, #sessionsPerDay, #callsPerSession, #workDays').forEach(inp => {
     inp.addEventListener('input', render);
+  });
+
+  document.querySelectorAll('[data-calls-per-session]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('callsPerSession').value = btn.dataset.callsPerSession;
+      render();
+    });
   });
 
   // --- Print ---
@@ -1407,8 +1444,9 @@
       ['Output tok/s per User', fmt(val('outputTpsPerUser'), 0)],
       ['', ''],
       ['Number of Users', fmt(val('numUsers'), 0)],
-      ['Active Hours / Day', val('activeHrs')],
-      ['Duty Cycle', val('dutyCycle') + '%'],
+      ['Sessions / User / Day', fmt(val('sessionsPerDay'))],
+      ['Avg Model Calls / Session', fmt(val('callsPerSession'))],
+      ['Model Calls / User / Day', $('dailyCallsPerUser').textContent],
       ['Working Days / Month', val('workDays')],
       ['', ''],
       ['Annual TCO', $('annualTco').textContent],
@@ -1450,7 +1488,7 @@
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Frontier Model</th>
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Blended $/M</th>
               <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Breakeven Util.</th>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Monthly Frontier Cost</th>
+              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Monthly API Bill at Estimated Demand</th>
             </tr>
           </thead>
           <tbody>${breakevenHtml}</tbody>

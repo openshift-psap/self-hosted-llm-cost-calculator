@@ -19,6 +19,7 @@ node scripts/refresh-pricing.mjs --check   # frontier pricing snapshot freshness
 node scripts/refresh-presets.mjs --check   # scenario preset snapshot freshness
 node scripts/refresh-pricing.mjs --write   # regenerate pricing from OpenRouter
 node scripts/refresh-presets.mjs --write   # regenerate presets from InferenceX
+node scripts/test-calculations.mjs        # offline calculation + DOM-shim smoke tests
 
 # Inline JS syntax check (the app is one <script> block in index.html):
 node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];fs.writeFileSync('/tmp/inline.js',m.at(-1)[1]);"
@@ -69,11 +70,26 @@ flipped conclusions. Do not go back.)
 
 ### Demand model → average utilization only.
 
-Users × turns/hour × tokens/turn × effective hours → monthly demand →
+Users × sessions/user/day × model calls/session × working days × (ISL + OSL)
+→ monthly demand →
 `avg utilization = demand / (total_goodput × seconds_per_month)`. The
 average-utilization readout turning red above 100% is the only overload
 signal. A peak-concurrent calculation existed and was **deliberately removed**
 at the user's request — do not re-add it.
+
+Demand is independent of output tok/s/user. The former active-hours/duty-cycle
+model inferred more demand from faster streaming and was replaced by explicit
+session counts. Sessions/user/day defaults to 1 (an assumption); calls/session
+defaults to 251.47 (98,827 main + subagent calls / 393 sessions in
+`semianalysisai/cc-traces-weka-062126`). The separate 256k reference button uses
+173.70 (68,266 / 393 in `cc-traces-weka-062126-256k`). Both are editable; the
+reference buttons change only calls/session. These are selected, longer coding
+sessions, not measurements of tasks/user/day. A session can contain many tasks.
+Do not infer the corpus from model/hardware or change goodput when selecting a
+calls/session reference. Cost per consumed token is N/A at zero demand.
+
+Monthly API bills use `blended/M × monthlyDemand / 1e6`, not a hardcoded
+utilization. API blended $/M and breakeven utilization stay demand-independent.
 
 ### Removed inputs (do not re-add)
 
@@ -137,8 +153,8 @@ floor" and picked dominated points off the frontier. Do not regress.
 | Concurrency | run `conc` |
 
 Presets set infrastructure, workload-shape, and serving fields — and the model
-search box. They **never** touch demand-estimate inputs (users, active hours,
-duty cycle, working days), which stay at repo defaults.
+search box. They **never** touch demand-estimate inputs (users, sessions/day,
+calls/session, working days), which retain the user's current values.
 
 ### UI conventions
 
@@ -174,14 +190,12 @@ Muse-Spark-Open/MI355X).
 
 ## Testing without a browser
 
-There is no test suite. Verification is: `node --check` on the inline script
-and both `--check` commands, plus a Node DOM-shim smoke test pattern used
-throughout development (stub `document`/`Chart`/`fetch`, execute the inline
-IIFE, fire preset clicks and input events, assert field values). When making
-UI changes, run such a shim before deploying. Beware shim artifacts: `esc()`
-returns empty strings (no real innerHTML), and `closest()`/`querySelector`
-stubs must be wired to the right owner elements or interaction tests fail
-spuriously.
+Run `node scripts/test-calculations.mjs` for offline regression checks. It
+syntax-checks the inline script and runs it with `document`/`Chart`/`fetch`
+stubs, exercising session-demand inputs, speed independence, API bills,
+Weka reference buttons, benchmark preset preservation, zero demand, and print
+output. It does not verify real-browser layout or canvas rendering. Both
+snapshot `--check` commands are also required before deployment.
 
 ## Skills
 
@@ -204,3 +218,5 @@ avoid re-litigating them:
 6. Static chart y-axis → auto-scaling.
 7. Framework names in preset UI → removed.
 8. "Latest date first" preset selection → Pareto-frontier selection.
+9. Speed-derived demand (active hours × generation duty cycle) → explicit
+   sessions/user/day × model calls/session.
