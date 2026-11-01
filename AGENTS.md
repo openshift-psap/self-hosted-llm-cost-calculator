@@ -22,12 +22,13 @@ node scripts/refresh-presets.mjs --write   # regenerate presets from InferenceX
 node scripts/test-calculations.mjs        # offline calculation + DOM-shim smoke tests
 
 # Inline JS syntax check (the app is one <script> block in index.html):
-node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];fs.writeFileSync('/tmp/inline.js',m.at(-1)[1]);"
-node --check /tmp/inline.js
+node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];fs.writeFileSync('/tmp/opencode/inline.js',m.at(-1)[1]);"
+node --check /tmp/opencode/inline.js
 ```
 
-Both `--check` commands must pass before any deploy (they are part of the
-commit-push-deploy skill preflight). Snapshots are baked into `index.html`
+Both snapshot `--check` commands and `test-calculations.mjs` must pass before
+every deploy, including documentation-only changes. They are part of the
+commit-push-deploy skill preflight. Snapshots are baked into `index.html`
 between marker comments because the source APIs do not all send CORS headers.
 
 ## The cost model (current semantics — several earlier designs were replaced)
@@ -90,6 +91,22 @@ calls/session reference. Cost per consumed token is N/A at zero demand.
 
 Monthly API bills use `blended/M × monthlyDemand / 1e6`, not a hardcoded
 utilization. API blended $/M and breakeven utilization stay demand-independent.
+
+### Updating the Weka demand references
+
+The pinned dataset cards above and InferenceX's public dataset API provide
+the reference counts:
+
+- `https://inferencex.semianalysis.com/api/v1/datasets/cc-traces-weka-062126`
+- `https://inferencex.semianalysis.com/api/v1/datasets/cc-traces-weka-062126-256k`
+
+Use `(summary.mainTurns + summary.subagentTurns) / conversation_count`, or
+`summary.meanRequestsPerConversation`; subagent groups are not model calls.
+Use the mean for aggregate-volume estimates, not the median. The references
+are explicit user choices, not inferred from an infrastructure preset. Updating
+them requires keeping the input default, button values, source links, README,
+and regression expectations aligned. Sessions/user/day remains a usage
+assumption; do not infer it from benchmark duration or replay speed.
 
 ### Removed inputs (do not re-add)
 
@@ -197,13 +214,44 @@ Weka reference buttons, benchmark preset preservation, zero demand, and print
 output. It does not verify real-browser layout or canvas rendering. Both
 snapshot `--check` commands are also required before deployment.
 
+Important invariants: doubling usage doubles demand and API bills without
+changing blended $/M or breakeven utilization; changing streaming speed leaves
+demand unchanged; changing capacity alone leaves API bills unchanged; cache
+changes affect billing, not demand or measured self-hosted capacity. Presets
+must preserve edited demand inputs, not reset them to defaults.
+
+## Known review findings not yet fixed
+
+The session-demand and monthly-bill changes do not resolve every review item:
+
+- HTML `min`/`max` attributes are not calculation validation. Out-of-range
+  values remain possible, and zero goodput still displays 0% utilization and
+  $0/M despite positive demand. Zero **demand** is handled separately as N/A.
+- Above 100% average utilization, the scenario cost and chart marker still
+  clamp to full capacity. Do not present that as serving all offered demand.
+- `refresh-presets.mjs` re-sorts its below-target fallback by throughput,
+  overriding the documented most-interactive selection. Its cache-rate
+  helper also converts `null` to zero and can substitute a theoretical rate;
+  do not describe those cases as verified measured cache rates.
+- Monthly capacity uses 30.44 days while annual capacity uses 365.25 days;
+  this introduces a small (~0.0082%) monthly/annual inconsistency.
+
+Treat these as follow-up work, not fixes already covered by the smoke tests.
+
 ## Skills
 
 - `.claude/skills/commit-push-deploy/SKILL.md` — preflight, commit, push,
-  watch the Pages workflow, verify the live site. Preflight includes both
-  `--check` commands.
+  watch the Pages workflow for the exact pushed SHA, verify the live site.
+  Preflight includes both snapshot checks and the offline regression script.
 - `.claude/skills/refresh-frontier-pricing/SKILL.md` — how to change the
   frontier model list and refresh pricing.
+
+Stage only intended files by name. Leave unrelated untracked presentations,
+enablement material, and notes untouched. A successful Git push is not proof
+of a successful deployment: require the matching Pages run to complete with
+`success`, then check HTTP 200 and compare live HTML with the committed file.
+The public Actions API works when `gh` is not authenticated; Git push may
+still work through Git's separate credential configuration.
 
 ## Deliberate decisions log
 
