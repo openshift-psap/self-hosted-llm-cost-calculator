@@ -137,28 +137,35 @@ does not swamp the comparison band; the linear auto-scale rule above remains
 the default. Below 640px the chart hides its legend and breakeven percentage
 labels (the table retains them) to avoid collisions.
 
-The main column opens with an at-a-glance strip (self-hosted $/M at demand,
-cheapest enabled API, monthly fleet bill, utilization) and a generated
-verdict sentence. Its wording is derived, never hardcoded: API-cheaper,
+The design is a technical cost worksheet, not a dashboard of cards: cool
+workshop paper (`--paper`), a sheet (`--sheet`), ink (`--ink`), ruled sections
+and one owned-infrastructure green. Archivo carries UI and editorial type;
+IBM Plex Mono carries every numeric readout and tabular figure. Avoid the
+generic SaaS-card kit, all-caps labels, middle-dot meta strings and system
+fonts when extending it.
+
+The main column opens with an editorial verdict sentence followed by a ledger
+strip (self-hosted $/M at demand, cheapest enabled API, monthly fleet bill,
+utilization). Its wording is derived, never hardcoded: API-cheaper,
 self-hosted-cheaper, zero-demand, zero-capacity, overloaded, no-model-selected
-and invalid-input states are distinct. The sidebar "Results" panel mirrors the
-demand-based numbers and keeps the 100%-utilization floor and derivation below
-a divider. Input sections are separate bordered, tinted `.section-card`s (model,
-infrastructure, workload, serving, demand, results); the collapsible ones are
-native `<details>` accordions, open by default. Validation messages live in a
-standalone alert card above them rather than inside the model card.
+and invalid-input states are distinct. The sidebar "Cost basis" section mirrors
+the demand-based numbers and keeps the 100%-utilization floor and derivation
+below a divider. Input sections are ruled `.sheet-section` blocks (model,
+infrastructure, workload, serving, demand, cost basis); the collapsible ones
+are native `<details>` accordions, open by default. Validation messages live in
+a standalone alert block above them rather than inside the model section.
 
 The page opens on the `glm-5-2-b200` preset (`DEFAULT_PRESET_ID`): GLM-5.2 on
 one 8×B200 node. The hardcoded HTML values mirror that preset so the first paint
 does not flash stale defaults. Scenario presets sit in the header to the right
-of the title (featured quick-select buttons plus the full dropdown); the
-provenance caption stays in the Self-Hosted Model card.
+of the title (featured quick-select tabs plus the full dropdown); the
+provenance caption stays in the Self-Hosted model section.
 
-Frontier API pricing lives in a right-hand rail inside `.main` at ≥1200px
-(nested grid: content column + `clamp(280px, 21vw, 340px)`), so it is visible
-without scrolling the sidebar; below 1200px it stacks under the breakeven table
-with the provenance footnote last. The rail is the same `#frontierList` panel —
-no separate pricing state.
+Frontier API pricing lives in a right-hand market-board rail inside `.main` at
+≥1320px (nested grid: content column + `clamp(240px, 20vw, 276px)`), so it is
+visible without scrolling the sidebar; below 1320px it stacks under the
+breakeven table with the provenance footnote last. The rail is the same
+`#frontierList` panel — no separate pricing state.
 
 ## Frontier comparison rules
 
@@ -171,8 +178,9 @@ no separate pricing state.
   patterns narrow and the list **provider-contiguous** (the UI groups by
   provider in list order).
 - The frontier list UI is provider-grouped accordion rows: one compact row per
-  model (checkbox, swatch, name, price triple, blended $/M); price editing and
-  blend math expand on click. Keep it compact.
+  model (checkbox, swatch, name, slash-separated input/cached/output price
+  triple, blended $/M); price editing and blend math expand on click. Keep it
+  compact.
 - Snapshot prices render immediately; live requests time out after eight seconds.
   Keep fallback status visible. Missing live cached pricing uses the live input
   rate, consistently with the refresh script. A model with unusable input/output

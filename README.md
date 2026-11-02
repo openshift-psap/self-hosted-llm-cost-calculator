@@ -228,7 +228,7 @@ live-site verification workflow.
 
 ## Tech stack
 
-Single HTML file, no build step. Uses Chart.js 4.x from CDN, vanilla JavaScript, and browser `fetch()` for API calls (OpenRouter and HuggingFace support CORS; InferenceX does not, so presets are baked as a snapshot). The pricing and preset refresh scripts are maintenance tools only; they are not part of the deployed page.
+Single HTML file, no build step. Uses Chart.js 4.x and the Archivo / IBM Plex Mono webfonts from CDNs, vanilla JavaScript, and browser `fetch()` for API calls (OpenRouter and HuggingFace support CORS; InferenceX does not, so presets are baked as a snapshot). The pricing and preset refresh scripts are maintenance tools only; they are not part of the deployed page.
 
 Numerical results remain usable if the Chart.js CDN is unavailable. The app's
 Print button and native browser printing both regenerate a current report.

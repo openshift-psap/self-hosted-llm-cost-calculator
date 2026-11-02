@@ -5,26 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Self-Hosted vs Frontier API Cost Comparison</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<style>
-  :root {
-    --surface-1: #fcfcfb;
-    --page-plane: #f9f9f7;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted: #6b6a65;
-    --gridline: #e1e0d9;
-    --baseline: #c3c2b7;
-    --border: rgba(11,11,11,0.10);
-    --warn: #b00020;
-    --self-hosted: #CC0000;
-    --cat-1: #2a78d6;
-    --cat-2: #eb6834;
-    --cat-3: #1baf7a;
-    --cat-4: #eda100;
-    --cat-5: #e87ba4;
-    --cat-6: #008300;
-    --cat-7: #4a3aa7;
-    --cat-8: #e34948;
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>  :root {
+    /* Workshop paper, ink, and one owned-infrastructure green. */
+    --paper: #eef1ee;
+    --sidebar-plane: #f4f6f3;
+    --sheet: #fbfcfa;
+    --ink: #141917;
+    --ink-2: #47514c;
+    --ink-3: #6d7772;
+    --rule: #c6cec9;
+    --rule-soft: #dde3df;
+    --green: #1d5b44;
+    --green-soft: #e3ece6;
+    --oxide: #a33a2a;
+    --cat-1: #1d5b44;
+    --cat-2: #a06a2c;
+    --cat-3: #35618e;
+    --cat-4: #7a4e6e;
+    --cat-5: #5c7a55;
+    --cat-6: #4b6b72;
+    --cat-7: #6a5a8c;
+    --cat-8: #9a5b3a;
+
+    /* Compatibility aliases used by the print view. */
+    --surface-1: #fbfcfa;
+    --page-plane: #eef1ee;
+    --text-primary: #141917;
+    --text-secondary: #47514c;
+    --text-muted: #6d7772;
+    --gridline: #dde3df;
+    --baseline: #c6cec9;
+    --border: rgba(20, 25, 23, 0.10);
+    --warn: #a33a2a;
+    --self-hosted: #1d5b44;
+
+    --font-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,718 +51,763 @@
   body {
     display: flex;
     flex-direction: column;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: var(--page-plane);
-    color: var(--text-primary);
+    font-family: var(--font-ui);
+    background: var(--paper);
+    color: var(--ink);
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
 
+  a { color: var(--green); }
+  button:focus-visible, a:focus-visible, select:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+
+  /* Masthead: the title and the operating-point tabs share one line. */
   .top-bar {
     flex: none;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--gridline);
-    background: var(--surface-1);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: start;
-    gap: 24px;
+    gap: 28px;
+    padding: 20px 24px 14px;
+    background: var(--sheet);
+    border-bottom: 1px solid var(--ink);
   }
-  .top-bar > .brand { min-width: 0; }
-  .top-bar .btn-print { align-self: start; margin-top: 2px; }
+  .brand { min-width: 0; }
+  h1 {
+    font-size: 26px;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  .subtitle {
+    margin-top: 5px;
+    max-width: 82ch;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
 
   .preset-bar {
-    width: clamp(300px, 32vw, 540px);
-    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    justify-self: end;
-  }
-
-  h1 {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 1px;
-  }
-
-  .subtitle {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 0;
-  }
-
-  .btn-print {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: inherit;
-    color: var(--text-secondary);
-    background: var(--surface-1);
-    border: 1px solid var(--baseline);
-    border-radius: 6px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .btn-print svg { width: 13px; height: 13px; flex: none; }
-  .btn-print:hover {
-    border-color: var(--cat-1);
-    color: var(--cat-1);
-  }
-
-  #printOverlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: #fcfcfb;
-    overflow: auto;
-    padding: 28px;
-    font-family: system-ui, -apple-system, sans-serif;
-    color: #0b0b0b;
-  }
-  #printOverlay.active { display: block; }
-  #printOverlay .print-close {
-    position: fixed;
-    top: 12px;
-    right: 20px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: inherit;
-    background: var(--surface-1);
-    border: 1px solid var(--baseline);
-    border-radius: 4px;
-    cursor: pointer;
-    z-index: 1001;
-  }
-  #printOverlay .print-close:hover { border-color: var(--cat-1); color: var(--cat-1); }
-  #printOverlay .print-actions {
-    position: fixed;
-    top: 12px;
-    right: 100px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: inherit;
-    background: var(--cat-1);
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    z-index: 1001;
-  }
-  #printOverlay .print-actions:hover { opacity: 0.9; }
-
-  .layout {
-    display: grid;
-    grid-template-columns: clamp(320px, 26vw, 400px) minmax(0, 1fr);
-    flex: 1;
-    min-height: 0;
-  }
-
-  @media (max-width: 900px) {
-    html, body { overflow: auto; }
-    body { height: auto; }
-    .layout {
-      grid-template-columns: 1fr;
-      height: auto;
-      flex: none;
-    }
-    .sidebar { max-height: none !important; overflow: visible !important; }
-    .main { height: auto !important; }
-  }
-
-  .sidebar {
-    overflow-y: auto;
-    padding: 16px;
-    border-right: 1px solid var(--gridline);
-    background: var(--page-plane);
-  }
-
-  .main {
-    overflow-y: auto;
-    padding: 16px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(280px, 21vw, 340px);
-    grid-auto-rows: min-content;
-    align-content: start;
-    gap: 16px;
-  }
-  /* Every direct child except the pricing rail sits in the wide left column. */
-  .main > :not(.frontier-aside) { grid-column: 1; }
-  .frontier-aside {
-    grid-column: 2;
-    grid-row: 1 / span 4;
-    align-self: start;
+    align-items: flex-end;
+    gap: 4px;
+    width: clamp(320px, 33vw, 520px);
     min-width: 0;
   }
-
-  /* Below 1200px the rail stacks under the results column. */
-  @media (max-width: 1199px) {
-    .main { grid-template-columns: minmax(0, 1fr); }
-    .frontier-aside { grid-column: 1; grid-row: auto; }
-    /* Keep the provenance footnote at the very end once the rail stacks. */
-    .footer-note { order: 2; }
-  }
-
-  .panel {
-    border: 1px solid var(--gridline);
-    border-radius: 8px;
-    padding: 12px;
-    background: var(--surface-1);
-  }
-
-  .sidebar .panel,
-  .frontier-aside .panel {
-    margin-bottom: 16px;
-    border: 1px solid var(--gridline);
-    border-radius: 8px;
-    padding: 16px;
-    background: var(--surface-1);
-    box-shadow: 0 1px 2px rgba(11,11,11,0.03);
-  }
-  .sidebar .panel:last-child,
-  .frontier-aside .panel:last-child { margin-bottom: 0; }
-
-  .panel-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--baseline);
-  }
-
-  /* Each input group is its own bordered card with a distinct, very light
-     background. Native <details> keeps the collapsible ones keyboard accessible. */
-  .section-card {
-    background: var(--card-bg, var(--surface-1));
-    border: 1px solid var(--card-border, var(--gridline));
-    border-radius: 10px;
-    padding: 0 14px 12px;
-    margin-bottom: 12px;
-  }
-  .section-card:last-child { margin-bottom: 0; }
-
-  .card-head,
-  .section-card > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 12px 0 9px;
-    user-select: none;
-  }
-  .section-card > summary {
-    list-style: none;
-    cursor: pointer;
-  }
-  .section-card > summary::-webkit-details-marker { display: none; }
-  .section-card > summary::after {
-    content: '▾';
-    font-size: 10px;
-    color: var(--text-muted);
-    transition: transform 0.15s;
-  }
-  .section-card:not([open]) > summary::after { transform: rotate(-90deg); }
-  .section-card > summary:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 3px; border-radius: 4px; }
-  .section-card[open] > summary {
-    border-bottom: 1px solid var(--card-border, var(--gridline));
-    margin-bottom: 10px;
-  }
-  .section-card[open] > summary + * { margin-top: 0; }
-  .section-card[open] .field:last-child { margin-bottom: 2px; }
-
-  /* Section tints: light enough to keep AA text contrast, distinct enough to scan. */
-  .card-model    { --card-bg: #f4f7fc; --card-border: #dce5f2; }
-  .card-infra    { --card-bg: #f8f7f3; --card-border: #e6e3d9; }
-  .card-workload { --card-bg: #f3f8f5; --card-border: #dbe9e1; }
-  .card-serving  { --card-bg: #faf6ee; --card-border: #ece0c9; }
-  .card-demand   { --card-bg: #f7f4fa; --card-border: #e4dcf0; }
-  .card-results  { --card-bg: #fdf6f4; --card-border: #f1ddd7; }
-
-  .section-card .field input,
-  .section-card .field select { background: var(--surface-1); }
-
-  .field { margin-bottom: 8px; }
-  .field label {
-    display: block;
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-bottom: 2px;
-  }
-  .field input, .field select {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid var(--baseline);
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-    background: var(--surface-1);
-    color: var(--text-primary);
-  }
-  .field input:focus, .field select:focus {
-    outline: none;
-    border-color: var(--cat-1);
-    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
-  }
-
-  .field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .demand-note {
-    font-size: 11px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 6px 0 10px;
-  }
-  .demand-note a { color: var(--cat-1); }
-  .demand-reference {
-    padding: 3px 7px;
-    margin: 4px 2px 0 0;
-    font-size: 10.5px;
-    font-family: inherit;
-    color: var(--cat-1);
-    background: var(--page-plane);
-    border: 1px solid var(--baseline);
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .demand-reference:hover { border-color: var(--cat-1); }
-
-  /* Results panel: the answer, promoted out of the inputs. */
-  .results-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 12px;
-  }
-  .result .k {
-    display: block;
-    font-size: 10.5px;
-    color: var(--text-muted);
-  }
-  .result .v {
-    display: block;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: 1px;
-  }
-  .result .v.big { font-size: 17px; }
-  .result .v.warn { color: var(--warn); }
-  .result .unit { font-size: 10px; color: var(--text-muted); }
-  .results-divider {
-    border-top: 1px solid var(--gridline);
-    margin: 12px 0 10px;
-    padding-top: 8px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-  }
-
-  /* At-a-glance verdict tiles at the top of the results column. */
-  .verdict {
-    background: var(--surface-1);
-    border: 1px solid var(--gridline);
-    border-radius: 8px;
-    padding: 14px 16px;
-  }
-  .verdict-tiles {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-  }
-  .verdict-tile { min-width: 0; }
-  .verdict-tile .k {
-    display: block;
-    font-size: 10.5px;
-    font-weight: 700;
-    line-height: 1.25;
-    min-height: 2.5em;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: var(--text-muted);
-  }
-  .verdict-tile .v {
-    display: block;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-top: 3px;
-    color: var(--text-primary);
-    white-space: nowrap;
-  }
-  .verdict-tile .v.warn { color: var(--warn); }
-  .verdict-tile .v.small { font-size: 16px; }
-  .verdict-tile .sub {
-    display: block;
-    font-size: 11px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  /* The fleet-vs-API comparison is long; let it wrap instead of truncating. */
-  #verdictBillsSub { white-space: normal; overflow: visible; line-height: 1.3; }
-  .verdict-text {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--gridline);
-    font-size: 12.5px;
-    line-height: 1.55;
-    color: var(--text-secondary);
-  }
-  .verdict-text strong { color: var(--text-primary); }
-
   .preset-quick {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0 2px;
   }
   .preset-quick button {
-    padding: 7px 6px;
-    font-size: 11px;
-    font-weight: 600;
-    font-family: inherit;
-    line-height: 1.3;
-    color: var(--text-secondary);
-    background: var(--page-plane);
-    border: 1px solid var(--baseline);
-    border-radius: 6px;
+    appearance: none;
+    padding: 6px 9px 5px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    color: var(--ink-2);
+    font: 500 12px/1.2 var(--font-ui);
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
   }
-  .preset-quick button:hover { border-color: var(--cat-1); color: var(--cat-1); }
+  .preset-quick button:hover { color: var(--green); }
   .preset-quick button.active {
-    background: var(--cat-1);
-    border-color: var(--cat-1);
-    color: #fff;
+    color: var(--green);
+    border-bottom-color: var(--green);
   }
   .preset-select {
     width: 100%;
-    padding: 7px 8px;
-    border: 1px solid var(--baseline);
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-    background: var(--surface-1);
-    color: var(--text-primary);
+    max-width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 4px 18px 4px 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background-color: transparent;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+      linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+    background-position: calc(100% - 9px) 55%, calc(100% - 4px) 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    color: var(--ink-2);
+    font: 400 11.5px/1.4 var(--font-ui);
     cursor: pointer;
   }
   .preset-select:focus {
     outline: none;
-    border-color: var(--cat-1);
-    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
+    border-bottom-color: var(--green);
   }
-  .preset-provenance {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    line-height: 1.55;
-    margin-top: 10px;
-    padding-top: 9px;
-    border-top: 1px dashed var(--baseline);
-    display: none;
-  }
-  .preset-provenance.open { display: block; }
-  .preset-provenance a { color: var(--cat-1); }
-  .preset-provenance .src { color: var(--text-secondary); font-weight: 600; }
 
-  .math-toggle {
-    background: none;
-    border: 0;
+  .btn-print {
+    align-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--ink-2);
+    font: 600 11.5px var(--font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-print svg { width: 13px; height: 13px; flex: none; }
+  .btn-print:hover { border-color: var(--green); color: var(--green); }
+
+  /* Worksheet split: inputs on paper, report on sheet. */
+  .layout {
+    display: grid;
+    grid-template-columns: clamp(320px, 26vw, 368px) minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+  }
+  .sidebar {
+    overflow-y: auto;
+    padding: 20px 22px 30px;
+    background: var(--sidebar-plane);
+    border-right: 1px solid var(--rule);
+  }
+  .main {
+    overflow-y: auto;
+    padding: 24px 28px 30px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 20vw, 276px);
+    grid-auto-rows: min-content;
+    align-items: start;
+    gap: 30px;
+    background: var(--sheet);
+  }
+  .report-column {
+    display: grid;
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 26px;
+    min-width: 0;
+  }
+  .frontier-aside {
+    min-width: 0;
+    padding-left: 22px;
+    border-left: 1px solid var(--rule);
+  }
+
+  /* Sections are ruled blocks in one continuous worksheet, not cards. */
+  .sheet-section {
+    padding: 14px 0 2px;
+    border-top: 1px solid var(--rule);
+  }
+  .model-block { padding-top: 0; border-top: 0; }
+  .section-head,
+  .sheet-section > summary {
+    margin-bottom: 9px;
+    color: var(--ink);
+    font: 600 12.5px/1.3 var(--font-ui);
+    letter-spacing: 0;
+  }
+  .sheet-section > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     padding: 0;
-    font-family: inherit;
-    font-size: 11px;
-    color: var(--cat-1);
+    list-style: none;
     cursor: pointer;
     user-select: none;
-    margin-top: 6px;
-    display: inline-block;
+  }
+  .sheet-section > summary::-webkit-details-marker { display: none; }
+  .sheet-section > summary::after {
+    content: '+';
+    color: var(--ink-3);
+    font: 400 15px/1 var(--font-data);
+  }
+  .sheet-section[open] > summary::after { content: '−'; }
+  .sheet-section[open] > summary { margin-bottom: 10px; }
+  .sheet-section > summary:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+  .sheet-section[open] .field:last-child { margin-bottom: 2px; }
+
+  /* Underlined fields read like a form on paper. */
+  .field { min-width: 0; margin-bottom: 9px; }
+  .field label {
+    display: block;
+    margin-bottom: 1px;
+    color: var(--ink-3);
+    font: 400 10.5px/1.3 var(--font-ui);
+  }
+  .field input,
+  .field select {
+    width: 100%;
+    min-width: 0;
+    padding: 4px 2px 5px;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font: 400 13px/1.3 var(--font-data);
+  }
+  .field input[type="text"],
+  .field select { font-family: var(--font-ui); font-size: 13px; }
+  .field input:focus,
+  .field select:focus {
+    outline: none;
+    border-bottom-color: var(--green);
+    box-shadow: 0 1px 0 0 var(--green);
+  }
+  .field input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .field input::placeholder { color: var(--ink-3); }
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 14px;
+  }
+
+  .preset-provenance {
+    display: none;
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--rule-soft);
+    color: var(--ink-3);
+    font: 400 10.5px/1.55 var(--font-ui);
+  }
+  .preset-provenance.open { display: block; }
+  .preset-provenance .src { color: var(--ink-2); font-weight: 500; }
+  .preset-provenance a {
+    color: var(--green);
+    text-decoration: none;
+    border-bottom: 1px solid var(--green-soft);
+  }
+  .preset-provenance a:hover { border-bottom-color: var(--green); }
+
+  .demand-note {
+    margin-top: 8px;
+    color: var(--ink-3);
+    font: 400 10.5px/1.55 var(--font-ui);
+  }
+  .demand-reference {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background: none;
+    color: var(--ink-2);
+    font: 500 10.5px var(--font-ui);
+    cursor: pointer;
+  }
+  .demand-reference:hover { border-bottom-color: var(--green); color: var(--green); }
+  .demand-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule-soft);
+    color: var(--ink-2);
+    font: 400 10.5px/1.4 var(--font-data);
+  }
+  .demand-totals strong { color: var(--ink); font-weight: 500; }
+
+  .basis-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    color: var(--ink-2);
+    font-size: 11.5px;
+  }
+  .basis-row strong {
+    color: var(--ink);
+    font: 500 14px/1.2 var(--font-data);
+  }
+  .basis-row .unit {
+    margin-left: 2px;
+    color: var(--ink-3);
+    font: 400 10px var(--font-data);
+  }
+  .basis-figure { display: inline-flex; align-items: baseline; }
+  .basis-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding-top: 8px;
+    color: var(--ink-3);
+    font: 400 10px/1.4 var(--font-ui);
+  }
+  .basis-meta strong { color: var(--ink-2); font: 500 10px var(--font-data); }
+
+  .math-toggle {
+    margin-top: 10px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--green);
+    font: 500 11px var(--font-ui);
+    cursor: pointer;
   }
   .math-toggle:hover { text-decoration: underline; }
   .math-detail {
-    font-size: 11px;
-    color: var(--text-muted);
-    line-height: 1.55;
-    margin-top: 6px;
     display: none;
+    margin-top: 8px;
+    color: var(--ink-3);
+    font: 400 10.5px/1.6 var(--font-ui);
   }
   .math-detail.open { display: block; }
+  .math-detail strong { color: var(--ink); }
 
   .hf-search-wrap { position: relative; }
   .hf-results {
-    position: absolute; top: 100%; left: 0; right: 0; z-index: 10;
-    background: var(--surface-1);
-    border: 1px solid var(--baseline);
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-    max-height: 160px;
-    overflow-y: auto;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
     display: none;
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
   }
   .hf-results.open { display: block; }
   .hf-result {
     display: block;
     width: 100%;
-    text-align: left;
-    font-family: inherit;
-    color: inherit;
-    background: none;
+    padding: 5px 6px;
     border: 0;
-    padding: 4px 6px;
-    font-size: 11px;
+    border-bottom: 1px solid var(--rule-soft);
+    background: none;
+    color: var(--ink);
+    font: 400 11px var(--font-ui);
+    text-align: left;
     cursor: pointer;
-    border-bottom: 1px solid var(--gridline);
   }
-  .hf-result:hover { background: var(--page-plane); }
-  .hf-result .dl { color: var(--text-muted); font-size: 9px; }
+  .hf-result:hover { background: var(--green-soft); }
+  .hf-result .dl { color: var(--ink-3); font: 400 9px var(--font-data); }
 
-  .frontier-list { list-style: none; }
+  .input-errors {
+    margin: 0 0 14px;
+    padding: 4px 0 4px 10px;
+    border-left: 3px solid var(--oxide);
+    color: var(--oxide);
+    font: 400 11px/1.5 var(--font-ui);
+  }
+  [aria-invalid="true"] { border-bottom-color: var(--oxide) !important; }
+
+  /* The verdict is the hero: one sentence, then a ledger line of figures. */
+  .verdict { padding: 0; }
+  .verdict-text {
+    max-width: 64ch;
+    color: var(--ink);
+    font: 400 22px/1.4 var(--font-ui);
+    letter-spacing: -0.015em;
+  }
+  .verdict-text strong { font-weight: 600; }
+  .verdict-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 18px;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+  .verdict-tile {
+    min-width: 0;
+    padding: 9px 12px 10px;
+    border-left: 1px solid var(--rule-soft);
+  }
+  .verdict-tile:first-child { padding-left: 0; border-left: 0; }
+  .verdict-tile .k {
+    display: block;
+    color: var(--ink-3);
+    font: 400 10px/1.3 var(--font-ui);
+  }
+  .verdict-tile .v {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink);
+    font: 500 20px/1.1 var(--font-data);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .verdict-tile .v.small { font-size: 16px; }
+  .verdict-tile .v.warn { color: var(--oxide); }
+  .verdict-tile .sub {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--ink-2);
+    font: 400 10.5px/1.35 var(--font-ui);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  #verdictBillsSub { white-space: normal; overflow: visible; }
+
+  .chart-wrap { min-height: 0; }
+  .chart-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .chart-head .panel-title {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: var(--ink);
+    font: 600 13px/1.3 var(--font-ui);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .log-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-2);
+    font: 400 11px var(--font-ui);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .log-toggle input { margin: 0; accent-color: var(--green); cursor: pointer; }
+  .chart-status {
+    margin-bottom: 8px;
+    color: var(--ink-3);
+    font: 400 11.5px var(--font-ui);
+  }
+  .chart-canvas-holder {
+    position: relative;
+    height: clamp(300px, 36vh, 380px);
+  }
+
+  .breakeven-table { overflow-x: auto; }
+  .breakeven-table h3 {
+    margin-bottom: 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    color: var(--ink);
+    font: 600 13px/1.3 var(--font-ui);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .breakeven-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .breakeven-table th {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-3);
+    font: 400 10px/1.3 var(--font-ui);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .breakeven-table th:first-child { text-align: left; }
+  .breakeven-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--rule-soft);
+    font: 400 12px var(--font-data);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .breakeven-table td:first-child {
+    color: var(--ink);
+    font: 500 12px var(--font-ui);
+    text-align: left;
+  }
+  .breakeven-table .swatch {
+    display: inline-block;
+    width: 12px;
+    height: 2px;
+    margin-right: 7px;
+    vertical-align: middle;
+  }
+
+  /* Frontier prices as a market board, not a stack of cards. */
+  .market-head h2 {
+    margin-bottom: 2px;
+    color: var(--ink);
+    font: 600 13px/1.3 var(--font-ui);
+  }
+  .market-caption {
+    margin-top: 3px;
+    color: var(--ink-3);
+    font: 400 9.5px/1.45 var(--font-ui);
+  }
+  .loading-msg {
+    margin-top: 4px;
+    padding: 0;
+    color: var(--ink-3);
+    font: 400 10.5px/1.5 var(--font-ui);
+  }
+  .frontier-list { margin-top: 6px; list-style: none; }
   .frontier-group {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin: 10px 0 2px;
+    margin: 12px 0 2px;
+    padding-top: 7px;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-2);
+    font: 600 10.5px/1.3 var(--font-ui);
   }
-  .frontier-group:first-child { margin-top: 0; }
+  .frontier-group:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
   .frontier-item {
-    border-bottom: 1px solid var(--gridline);
-    font-size: 11px;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 11.5px;
   }
-  .frontier-item:last-child { border-bottom: none; }
+  .frontier-item.unchecked .frontier-row { opacity: 0.45; }
   .frontier-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 0;
+    gap: 7px;
+    padding: 5px 0;
     cursor: pointer;
+  }
+  .frontier-row input[type="checkbox"] {
+    flex: none;
+    margin: 0;
+    accent-color: var(--green);
+    cursor: pointer;
+  }
+  .frontier-row .swatch {
+    flex: none;
+    width: 12px;
+    height: 2px;
+    border-radius: 0;
   }
   .frontier-expand {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     flex: 1;
     min-width: 0;
-    border: 0;
     padding: 0;
+    border: 0;
     background: none;
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
   }
-  button:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 2px; }
-  [aria-invalid="true"] { border-color: #b00020 !important; }
-  .input-errors {
-    color: #b00020;
-    font-size: 11.5px;
-    line-height: 1.45;
-    padding: 9px 11px;
-    margin-bottom: 12px;
-    background: #fff5f4;
-    border: 1px solid #f3c9c4;
-    border-radius: 8px;
-  }
-  .chart-status { font-size: 12px; color: var(--text-secondary); }
-  .frontier-item.unchecked .frontier-row { opacity: 0.5; }
-  .frontier-row input[type="checkbox"] {
-    flex: none;
-    margin: 0;
-    accent-color: var(--cat-1);
-    cursor: pointer;
-  }
-  .frontier-row .swatch {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-  }
   .frontier-row-main { flex: 1; min-width: 0; }
-  .frontier-name { font-weight: 600; font-size: 11px; display: block; }
-  .frontier-row-prices { font-size: 10px; color: var(--text-muted); display: block; }
+  .frontier-name {
+    display: block;
+    color: var(--ink);
+    font: 500 11.5px/1.3 var(--font-ui);
+  }
+  .frontier-row-prices {
+    display: block;
+    color: var(--ink-3);
+    font: 400 9px/1.4 var(--font-data);
+    letter-spacing: -0.01em;
+  }
   .frontier-blended-val {
-    font-size: 11px;
-    font-weight: 700;
+    flex: none;
+    color: var(--ink);
+    font: 500 11px/1.2 var(--font-data);
     white-space: nowrap;
   }
   .frontier-caret {
     flex: none;
-    font-size: 10px;
-    color: var(--text-muted);
-    transition: transform 0.15s;
+    color: var(--ink-3);
+    font: 400 10px var(--font-data);
+    transition: transform 0.12s;
   }
   .frontier-item.expanded .frontier-caret { transform: rotate(90deg); }
-  .frontier-detail {
-    display: none;
-    padding: 2px 0 8px 24px;
-  }
+  .frontier-detail { display: none; padding: 2px 0 8px 21px; }
   .frontier-item.expanded .frontier-detail { display: block; }
   .frontier-prices {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 3px;
-    margin-top: 3px;
+    gap: 4px;
+    margin-top: 4px;
   }
   .frontier-prices label {
-    font-size: 10px;
-    color: var(--text-muted);
+    color: var(--ink-3);
+    font: 400 9px var(--font-ui);
   }
   .frontier-prices input {
     width: 100%;
-    padding: 3px 5px;
-    border: 1px solid var(--gridline);
-    border-radius: 3px;
-    font-size: 11px;
-    font-family: inherit;
+    padding: 3px 4px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--sheet);
+    color: var(--ink);
+    font: 400 10px var(--font-data);
   }
   .frontier-blended-math {
-    font-size: 10px;
-    color: var(--text-muted);
-    line-height: 1.45;
     margin-top: 4px;
-  }
-
-  .chart-wrap {
-    background: var(--surface-1);
-    border: 1px solid var(--gridline);
-    border-radius: 8px;
-    padding: 16px;
-    flex: 1;
-    min-height: 320px;
-    display: flex;
-    flex-direction: column;
-  }
-  .chart-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--baseline);
-  }
-  .chart-head .panel-title { margin: 0; padding: 0; border: 0; }
-  .log-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-  }
-  .log-toggle input { margin: 0; accent-color: var(--cat-1); cursor: pointer; }
-  .chart-canvas-holder {
-    flex: 1;
-    min-height: 280px;
-    position: relative;
-  }
-
-  .breakeven-table {
-    overflow-x: auto;
-    background: var(--surface-1);
-    border: 1px solid var(--gridline);
-    border-radius: 8px;
-    padding: 16px;
-  }
-  .breakeven-table h3 {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--baseline);
-  }
-  .breakeven-table table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 11.5px;
-  }
-  .breakeven-table th {
-    text-align: left;
-    font-size: 10.5px;
-    color: var(--text-muted);
-    font-weight: 600;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--baseline);
-  }
-  .breakeven-table td {
-    padding: 5px 8px;
-    border-bottom: 1px solid var(--gridline);
-  }
-  .breakeven-table .swatch {
-    display: inline-block;
-    width: 10px; height: 3px;
-    border-radius: 1px;
-    margin-right: 4px;
-    vertical-align: middle;
-  }
-
-  .loading-msg {
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 6px 0;
+    color: var(--ink-3);
+    font: 400 9px/1.5 var(--font-data);
   }
 
   .footer-note {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    text-align: center;
-    padding: 4px 0;
+    margin: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-3);
+    font: 400 10px/1.6 var(--font-ui);
+    text-align: left;
+  }
+  .footer-note a {
+    color: var(--green);
+    text-decoration: none;
+    border-bottom: 1px solid var(--green-soft);
+  }
+  .footer-note a:hover { border-bottom-color: var(--green); }
+
+  #printOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    padding: 32px;
+    overflow: auto;
+    background: var(--sheet);
+    color: var(--ink);
+    font-family: var(--font-ui);
+  }
+  #printOverlay.active { display: block; }
+  #printOverlay .print-close {
+    position: fixed;
+    top: 12px;
+    right: 20px;
+    z-index: 1001;
+    padding: 6px 14px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: var(--sheet);
+    color: var(--ink-2);
+    font: 600 11.5px var(--font-ui);
+    cursor: pointer;
+  }
+  #printOverlay .print-close:hover { border-color: var(--green); color: var(--green); }
+  #printOverlay .print-actions {
+    position: fixed;
+    top: 12px;
+    right: 100px;
+    z-index: 1001;
+    padding: 6px 14px;
+    border: 1px solid var(--green);
+    border-radius: 2px;
+    background: var(--green);
+    color: #fff;
+    font: 600 11.5px var(--font-ui);
+    cursor: pointer;
+  }
+  #printOverlay .print-actions:hover { background: #164734; }
+  #printOverlay .print-breakeven td {
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--rule-soft);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  #printOverlay .print-breakeven td:first-child {
+    color: var(--ink);
+    font-family: var(--font-ui);
+    text-align: left;
+  }
+
+  @media (max-width: 1319px) {
+    .main { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .report-column { display: contents; }
+    .frontier-aside {
+      order: 1;
+      padding-top: 18px;
+      padding-left: 0;
+      border-top: 1px solid var(--rule);
+      border-left: 0;
+    }
+    .footer-note { order: 2; }
   }
 
   @media (max-width: 1100px) {
-    .top-bar { gap: 16px; }
-    .preset-bar { width: clamp(280px, 30vw, 400px); }
-    .preset-quick button { font-size: 10.5px; padding: 6px 4px; }
-  }
-
-  @media (max-width: 900px) {
     .top-bar {
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px 14px;
-      padding: 12px 14px;
+      padding: 16px 18px 12px;
     }
-    .top-bar .brand { grid-column: 1; grid-row: 1; }
-    .top-bar .btn-print { grid-column: 2; grid-row: 1; }
+    .brand { grid-column: 1; grid-row: 1; }
+    .btn-print { grid-column: 2; grid-row: 1; }
     .preset-bar {
       grid-column: 1 / -1;
       grid-row: 2;
       width: 100%;
-      justify-self: stretch;
+      align-items: stretch;
     }
-    .field input, .field select, .preset-select { font-size: 16px; }
-    .verdict-tile .v { font-size: 18px; }
-    .main { padding: 14px; gap: 14px; }
-    .sidebar { padding: 14px; }
+    .preset-quick { justify-content: flex-start; }
   }
 
-  @media (max-width: 640px) {
-    .verdict-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .verdict { padding: 12px 14px; }
-    .verdict-tile .v { font-size: 17px; }
-    .verdict-tile .v.small { font-size: 14px; }
+  @media (max-width: 960px) {
+    html, body { height: auto; overflow: auto; }
+    body { display: block; height: auto; }
+    .top-bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px 14px;
+      padding: 16px 16px 12px;
+    }
+    .brand { grid-column: 1; grid-row: 1; }
+    .btn-print { grid-column: 2; grid-row: 1; }
+    .preset-bar {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      width: 100%;
+      align-items: stretch;
+    }
+    .preset-quick { justify-content: flex-start; }
+    h1 { font-size: 22px; }
+    .layout {
+      display: flex;
+      flex-direction: column;
+      flex: none;
+      height: auto;
+    }
+    .main {
+      grid-template-columns: 1fr;
+      height: auto;
+      overflow: visible;
+      padding: 18px 16px 24px;
+      gap: 22px;
+    }
+    .sidebar {
+      max-height: none;
+      overflow: visible;
+      padding: 18px 16px 26px;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .field input, .field select, .preset-select { font-size: 16px; }
+  }
+
+  @media (max-width: 600px) {
+    .verdict-text { font-size: 19px; }
+    .verdict-tiles { grid-template-columns: 1fr 1fr; }
+    .verdict-tile { padding: 8px 10px; }
+    .verdict-tile:nth-child(odd) { padding-left: 0; border-left: 0; }
+    .verdict-tile:nth-child(n + 3) { border-top: 1px solid var(--rule-soft); }
+    .verdict-tile .v { font-size: 18px; }
+    .verdict-tile .v.small { font-size: 15px; }
+    .chart-canvas-holder { height: 280px; }
+    .breakeven-table th,
+    .breakeven-table td { padding: 5px 4px; }
+    .breakeven-table th:first-child,
+    .breakeven-table td:first-child { min-width: 128px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
   }
 
   @media print {
@@ -758,23 +820,22 @@
 </style>
 </head>
 <body>
-
 <header class="top-bar">
   <div class="brand">
     <h1>Self-Hosted vs Frontier API Cost Comparison</h1>
-    <p class="subtitle">Compare self-hosted cost per token with frontier APIs at your expected demand.</p>
+    <p class="subtitle">Price a measured self-hosted deployment against frontier APIs at your demand.</p>
   </div>
   <div class="preset-bar">
-    <div class="preset-quick" id="presetQuick" role="group" aria-label="Featured presets"></div>
-    <select id="presetSelect" class="preset-select" aria-label="Scenario preset">
-      <option value="custom">Custom — use current values</option>
+    <div class="preset-quick" id="presetQuick" role="group" aria-label="Featured operating points"></div>
+    <select id="presetSelect" class="preset-select" aria-label="All operating points">
+      <option value="custom">Custom: use current values</option>
     </select>
   </div>
   <button class="btn-print" id="btnPrint">
     <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 6V2h8v4M4 12H2V6h12v6h-2M4 9h8v5H4z"/>
     </svg>
-    Print
+    Print report
   </button>
 </header>
 
@@ -786,29 +847,27 @@
 
 <div class="layout">
 
-  <!-- SIDEBAR: input sections, each in its own card -->
+  <!-- INPUTS: one ruled worksheet, not a stack of cards -->
   <div class="sidebar">
 
     <div id="inputErrors" class="input-errors" role="status" aria-live="polite" hidden></div>
 
-    <section class="section-card card-model" aria-labelledby="modelCardTitle">
-      <div class="card-head" id="modelCardTitle">Self-Hosted Model</div>
-
+    <section class="sheet-section model-block" aria-labelledby="modelHeading">
+      <h2 class="section-head" id="modelHeading">Self-hosted model</h2>
       <div class="field hf-search-wrap">
-        <label for="hfSearch">Model (search HuggingFace)</label>
-        <input type="text" id="hfSearch" placeholder="Search models..." autocomplete="off" value="GLM-5.2">
+        <label for="hfSearch">Model</label>
+        <input type="text" id="hfSearch" placeholder="Search HuggingFace" autocomplete="off" value="GLM-5.2">
         <div class="hf-results" id="hfResults"></div>
       </div>
-
       <div class="preset-provenance" id="presetProvenance"></div>
     </section>
 
-    <details class="section-card card-infra" open>
+    <details class="sheet-section" open>
       <summary>Infrastructure</summary>
       <div class="field-row">
         <div class="field">
           <label for="gpuType">GPU type</label>
-          <input type="text" id="gpuType" value="B200" placeholder="e.g. H200, H100, A100">
+          <input type="text" id="gpuType" value="B200" placeholder="B200, H200, MI355X">
         </div>
         <div class="field">
           <label for="gpusPerNode">GPUs per node</label>
@@ -827,11 +886,11 @@
       </div>
     </details>
 
-    <details class="section-card card-workload" open>
-      <summary>Workload Shape</summary>
+    <details class="sheet-section" open>
+      <summary>Workload shape</summary>
       <div class="field-row">
         <div class="field">
-          <label for="concurrency">Concurrency (sessions)</label>
+          <label for="concurrency">Concurrent sessions</label>
           <input type="number" id="concurrency" value="32" min="1" step="1">
         </div>
         <div class="field">
@@ -851,8 +910,8 @@
       </div>
     </details>
 
-    <details class="section-card card-serving" open>
-      <summary>Serving Performance</summary>
+    <details class="sheet-section" open>
+      <summary>Serving performance</summary>
       <div class="field-row">
         <div class="field">
           <label for="totalGoodput">Total goodput (tok/s)</label>
@@ -865,8 +924,8 @@
       </div>
     </details>
 
-    <details class="section-card card-demand" open>
-      <summary>Demand Estimate</summary>
+    <details class="sheet-section" open>
+      <summary>Demand estimate</summary>
       <div class="field-row">
         <div class="field">
           <label for="numUsers">Number of users</label>
@@ -888,55 +947,57 @@
         </div>
       </div>
       <div class="demand-note">
-        Usage assumption, not benchmark data: a session may contain several tasks, and calls/session includes subagent calls.
-        Weka June 21 means (393 sessions):
-        <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
-        <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button>
-        (<a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
-        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>).
-        These filtered coding traces favour longer sessions; presets never change this estimate.
+        Usage assumption, not benchmark data. A session can contain several tasks, and calls per session includes subagent calls.
+        Weka June 2026, 393 sessions:
+        <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">251.47</button>
+        full-context mean, or
+        <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">173.70</button>
+        256k mean. Dataset cards:
+        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a>,
+        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>.
+        These selected coding traces favour longer sessions; presets never change this estimate.
+      </div>
+      <div class="demand-totals">
+        <span><strong id="monthlyDemand">—</strong> at this demand</span>
+        <span><strong id="dailyCallsPerUser">—</strong> calls / user / day</span>
       </div>
     </details>
 
-    <div class="section-card card-results" id="resultsPanel">
-      <div class="card-head">Results</div>
-      <div class="results-grid">
-        <div class="result">
-          <span class="k">Avg utilization</span>
-          <span class="v big" id="derivedUtil">—</span>
-        </div>
-        <div class="result">
-          <span class="k">Self-hosted cost at your demand</span>
-          <span class="v big" id="shCostAtUtil">—</span>
-          <span class="unit">per 1M tokens</span>
-        </div>
-        <div class="result">
-          <span class="k">Monthly token demand</span>
-          <span class="v" id="monthlyDemand">—</span>
-        </div>
-        <div class="result">
-          <span class="k">Model calls / user / day</span>
-          <span class="v" id="dailyCallsPerUser">—</span>
-        </div>
+    <section class="sheet-section" id="resultsPanel" aria-labelledby="basisHeading">
+      <h2 class="section-head" id="basisHeading">Cost basis</h2>
+      <div class="basis-row">
+        <span>Utilization at this demand</span>
+        <strong id="derivedUtil">—</strong>
       </div>
-      <div class="results-divider">
-        <div>Cost at 100% utilization: <strong id="shCostPerM">—</strong>/M tokens</div>
-        <div>Fleet: <strong id="totalGpus">—</strong> &nbsp;·&nbsp; Annual TCO: <strong id="annualTco">—</strong> &nbsp;·&nbsp; ISL:OSL <strong id="islOslRatio">—</strong></div>
+      <div class="basis-row">
+        <span>Self-hosted at demand</span>
+        <span class="basis-figure"><strong id="shCostAtUtil">—</strong><span class="unit">/M</span></span>
+      </div>
+      <div class="basis-row">
+        <span>At 100% utilization</span>
+        <span class="basis-figure"><strong id="shCostPerM">—</strong><span class="unit">/M</span></span>
+      </div>
+      <div class="basis-meta">
+        <span>Fleet <strong id="totalGpus">—</strong></span>
+        <span>TCO <strong id="annualTco">—</strong>/yr</span>
+        <span>ISL:OSL <strong id="islOslRatio">—</strong></span>
       </div>
       <button type="button" class="math-toggle" id="mathToggle" aria-expanded="false" aria-controls="mathExplanation">Show derivation</button>
       <div class="math-detail" id="mathExplanation"></div>
-    </div>
+    </section>
 
   </div>
 
-  <!-- MAIN: verdict, chart, breakeven -->
+  <!-- REPORT: verdict, chart, breakeven, pricing board -->
   <div class="main">
+    <div class="report-column">
     <section class="verdict" aria-label="Results at a glance">
+      <p class="verdict-text" id="verdictText">Calculating…</p>
       <div class="verdict-tiles">
         <div class="verdict-tile">
           <span class="k">Self-hosted at demand</span>
           <span class="v" id="verdictSelfHosted">—</span>
-          <span class="sub">per 1M tokens</span>
+          <span class="sub">per million tokens</span>
         </div>
         <div class="verdict-tile">
           <span class="k">Cheapest API</span>
@@ -944,7 +1005,7 @@
           <span class="sub" id="verdictBestApiSub">—</span>
         </div>
         <div class="verdict-tile">
-          <span class="k">Monthly fleet bill</span>
+          <span class="k">Fleet bill</span>
           <span class="v small" id="verdictBills">—</span>
           <span class="sub" id="verdictBillsSub">vs cheapest API —</span>
         </div>
@@ -954,12 +1015,11 @@
           <span class="sub">of measured capacity</span>
         </div>
       </div>
-      <p class="verdict-text" id="verdictText">Calculating…</p>
     </section>
 
     <div class="chart-wrap">
       <div class="chart-head">
-        <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
+        <div class="panel-title">Cost per million tokens by utilization</div>
         <label class="log-toggle"><input type="checkbox" id="logScale"> Log scale</label>
       </div>
       <p id="chartStatus" class="chart-status" role="status" hidden></p>
@@ -969,13 +1029,13 @@
     </div>
 
     <div class="breakeven-table">
-      <h3>Breakeven Summary</h3>
+      <h3>Breakeven summary</h3>
       <table>
         <thead>
           <tr>
-            <th>Frontier Model</th>
+            <th>Frontier model</th>
             <th>Blended $/M</th>
-            <th>Breakeven Util.</th>
+            <th>Breakeven</th>
             <th title="Monthly API bill at the estimated monthly token demand">Monthly API bill</th>
           </tr>
         </thead>
@@ -984,18 +1044,20 @@
     </div>
 
     <p class="footer-note">
-      Pricing via <a href="https://openrouter.ai" style="color: var(--cat-1);">OpenRouter</a> (live, with offline snapshot).
-      Models via <a href="https://huggingface.co" style="color: var(--cat-1);">HuggingFace</a>.
-      Presets via <a href="https://inferencex.semianalysis.com" style="color: var(--cat-1);">InferenceX</a> benchmarks.
-      Blended cost accounts for the ISL:OSL token mix and cache hit rate.
+      Pricing from <a href="https://openrouter.ai">OpenRouter</a> (live, with an offline snapshot).
+      Models from <a href="https://huggingface.co">HuggingFace</a>.
+      Operating points from <a href="https://inferencex.semianalysis.com">InferenceX</a> benchmarks.
+      Blended cost reflects the ISL:OSL mix and measured cache hit rate.
     </p>
+    </div>
 
     <aside class="frontier-aside" aria-label="Frontier API pricing">
-      <div class="panel">
-        <div class="panel-title">Frontier API Pricing</div>
-        <div id="frontierLoading" class="loading-msg" role="status">Using snapshot; checking OpenRouter...</div>
-        <ul class="frontier-list" id="frontierList"></ul>
+      <div class="market-head">
+        <h2>Frontier API pricing</h2>
+        <p class="market-caption">Input / cached / output, USD per million tokens.</p>
+        <div id="frontierLoading" class="loading-msg" role="status">Using snapshot; checking OpenRouter…</div>
       </div>
+      <ul class="frontier-list" id="frontierList"></ul>
     </aside>
   </div>
 
@@ -1007,8 +1069,8 @@
 
   const SECS_PER_YEAR = 365.25 * 24 * 3600;
   const SECS_PER_MONTH = SECS_PER_YEAR / 12;
-  const COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948','#0891b2','#8a5a44','#708160','#c2185b'];
-  const SELF_HOSTED_COLOR = '#CC0000';
+  const COLORS = ['#35618e','#a06a2c','#7a4e6e','#5c7a55','#8c5a4a','#4b6b72','#6a5a8c','#9a5b3a','#3f7a6e','#8a6a3a','#6b7a8a','#9a4a5a'];
+  const SELF_HOSTED_COLOR = '#1d5b44';
 
   // BEGIN FRONTIER_PRICING
   // Snapshot: 2026-10-31
@@ -1236,10 +1298,10 @@
     render();
     const s = preset.source;
     presetProvenance.innerHTML =
-      `<span class="src">${esc(s.precision)}${s.disagg ? ', disagg' : ''} &middot; c=${s.concurrency} &middot; ${v.outputTpsPerUser} tok/s/user &middot; ${esc(s.date)}</span><br>` +
-      `Node cost = $${s.gpuHourRate}/GPU-hr rental &times; 730 h &times; ${v.gpusPerNode} GPUs ` +
+      `<span class="src">Measured at precision ${esc(s.precision)}${s.disagg ? ' (disaggregated)' : ''}, ${s.concurrency} concurrent sessions, ${v.outputTpsPerUser} tok/s per user. Run date ${esc(s.date)}.</span><br>` +
+      `Node cost: $${s.gpuHourRate}/GPU-hour rental &times; 730 hours &times; ${v.gpusPerNode} GPUs ` +
       `(<a href="https://inferencex.semianalysis.com/chips" target="_blank" rel="noopener">InferenceX chip pricing</a>).<br>` +
-      `Measured agentic-traces run via <a href="${esc(s.runUrl)}" target="_blank" rel="noopener">InferenceX</a>.`;
+      `Measured agentic-traces run from <a href="${esc(s.runUrl)}" target="_blank" rel="noopener">InferenceX</a>.`;
     presetProvenance.classList.add('open');
   }
 
@@ -1254,11 +1316,15 @@
     presetProvenance.classList.remove('open');
   }
 
+  function displayPresetLabel(preset) {
+    return preset.label.replace(/\s·\s/g, ', ');
+  }
+
   function initPresets() {
     SCENARIO_PRESETS.forEach((p, i) => {
       const opt = document.createElement('option');
       opt.value = String(i);
-      opt.textContent = p.label;
+      opt.textContent = displayPresetLabel(p);
       presetSelect.appendChild(opt);
     });
 
@@ -1460,7 +1526,7 @@
           <span class="swatch" style="background: ${m.color};"></span>
           <span class="frontier-row-main">
             <span class="frontier-name">${esc(m.name)}</span>
-            <span class="frontier-row-prices" id="rowprices-${i}">in $${fmt(m.inputPrice)} &middot; cached $${fmt(m.cachedPrice, 3)} &middot; out $${fmt(m.outputPrice)}</span>
+            <span class="frontier-row-prices" id="rowprices-${i}">$${fmt(m.inputPrice)} / $${fmt(m.cachedPrice, 3)} / $${fmt(m.outputPrice)}</span>
           </span>
           <span class="frontier-blended-val" id="blended-${i}">&mdash;</span>
           <span class="frontier-caret">&#9656;</span>
@@ -1515,7 +1581,7 @@
     }
     const { costPerMAt100, costAtDerivedUtil, derivedUtil, overloaded, monthlyCost, monthlyDemand, frontierResults } = result;
     const best = frontierResults.reduce((a, b) => (!a || b.blended < a.blended ? b : a), null);
-    const utilText = derivedUtil === null ? 'N/A' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' — over capacity' : '');
+    const utilText = derivedUtil === null ? 'N/A' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' (over capacity)' : '');
     set('verdictSelfHosted', costAtDerivedUtil === null ? 'N/A' : fmtDollar(costAtDerivedUtil, 2));
     set('verdictBestApi', best ? `${fmtDollar(best.blended, 2)}/M` : 'N/A');
     set('verdictBestApiSub', best ? best.name : 'enable a model');
@@ -1538,19 +1604,19 @@
     }
     const apiName = esc(best.name);
     if (overloaded) {
-      $('verdictText').innerHTML = `Estimated demand exceeds the fleet's measured capacity at <strong>${esc(utilText)}</strong>. Add capacity or lower demand; self-hosted cost per token is undefined above capacity.`;
+      $('verdictText').innerHTML = `Estimated demand exceeds the fleet's measured capacity at <strong>${esc(utilText)}</strong>. Add capacity or lower demand. Self-hosted cost per token is undefined above capacity.`;
       return;
     }
     const sh = fmtDollar(costAtDerivedUtil, 2);
     const api = fmtDollar(best.blended, 2);
     if (costAtDerivedUtil <= best.blended) {
-      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong> — below every enabled frontier API. Nearest is ${apiName} at ${api}/M.`;
+      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong>, below every enabled frontier API. The nearest is ${apiName} at ${api}/M.`;
     } else {
       const be = best.breakeven;
       const beText = be === null ? ''
         : be <= 100 ? ` Break-even with ${apiName} is at <strong>${fmt(be, 1)}%</strong> utilization.`
         : ` ${apiName} needs more than 100% utilization to break even at this capacity.`;
-      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong> — the cheapest enabled API, ${apiName} at ${api}/M, is less expensive.${beText}`;
+      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong>. The cheapest enabled API, ${apiName} at ${api}/M, is less expensive.${beText}`;
     }
   }
 
@@ -1586,11 +1652,11 @@
     const demandB = (monthlyDemand / 1e9).toFixed(1);
     $('dailyCallsPerUser').textContent = fmt(callsPerUserDay);
     $('monthlyDemand').textContent = `${demandB}B tokens/month`;
-    $('derivedUtil').textContent = derivedUtil === null ? 'N/A — no capacity' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' — exceeds capacity' : '');
-    $('shCostAtUtil').textContent = costAtDerivedUtil === null ? (overloaded ? 'N/A — insufficient capacity' : 'N/A') : fmtDollar(costAtDerivedUtil, 2);
+    $('derivedUtil').textContent = derivedUtil === null ? 'N/A (no capacity)' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' (exceeds capacity)' : '');
+    $('shCostAtUtil').textContent = costAtDerivedUtil === null ? (overloaded ? 'N/A (insufficient capacity)' : 'N/A') : fmtDollar(costAtDerivedUtil, 2);
 
     if (overloaded) {
-      $('derivedUtil').style.color = '#e34948';
+      $('derivedUtil').style.color = '#a33a2a';
     } else {
       $('derivedUtil').style.color = '';
     }
@@ -1624,7 +1690,7 @@
       const el = document.getElementById('blended-' + i);
       if (el) el.textContent = `$${fmt(blended)}/M`;
       const rowPrices = document.getElementById('rowprices-' + i);
-      if (rowPrices) rowPrices.innerHTML = `in $${fmt(m.inputPrice)} &middot; cached $${fmt(m.cachedPrice, 3)} &middot; out $${fmt(m.outputPrice)}`;
+      if (rowPrices) rowPrices.textContent = `$${fmt(m.inputPrice)} / $${fmt(m.cachedPrice, 3)} / $${fmt(m.outputPrice)}`;
 
       const mathEl = document.getElementById('blended-math-' + i);
       if (mathEl) {
@@ -1647,6 +1713,7 @@
     $('breakevenBody').innerHTML = '';
     $('chartStatus').hidden = result.valid && typeof Chart === 'function';
     $('chartStatus').textContent = !result.valid ? 'Correct the highlighted inputs to view results.' : 'Chart unavailable. Numerical results are shown below.';
+    $('costChart').parentElement.hidden = !result.valid || typeof Chart !== 'function';
     if (!result.valid) return;
     const { utilizations, selfHostedCosts, frontierResults, costPerMAt100, derivedUtil, overloaded } = result;
 
@@ -1672,12 +1739,12 @@
         label: `Self-Hosted ${selectedModel}`,
         data: selfHostedCosts.map((y, i) => ({ x: utilizations[i], y })),
         borderColor: SELF_HOSTED_COLOR,
-        backgroundColor: 'rgba(204,0,0,0.04)',
+        backgroundColor: 'rgba(29,91,68,0.05)',
         borderWidth: 2.5,
         pointRadius: 0,
         pointHoverRadius: 4,
         pointHoverBackgroundColor: SELF_HOSTED_COLOR,
-        pointHoverBorderColor: '#fcfcfb',
+        pointHoverBorderColor: '#fbfcfa',
         pointHoverBorderWidth: 2,
         fill: false,
         tension: 0.3,
@@ -1709,35 +1776,35 @@
             type: 'linear',
             min: 1,
             max: 100,
-            title: { display: true, text: 'Average Utilization (% of capacity)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
-            ticks: { stepSize: 10, color: '#6b6a65', font: { size: 10 }, callback: v => String(v) },
-            grid: { color: '#e1e0d9', lineWidth: 1 },
-            border: { color: '#c3c2b7' },
+            title: { display: true, text: 'Average Utilization (% of capacity)', font: { size: 11, family: 'Archivo, system-ui, sans-serif' }, color: '#47514c' },
+            ticks: { stepSize: 10, color: '#6d7772', font: { size: 10, family: 'IBM Plex Mono, monospace' }, callback: v => String(v) },
+            grid: { color: '#dde3df', lineWidth: 1 },
+            border: { color: '#c6cec9' },
           },
           y: logScale ? {
             type: 'logarithmic',
             min: logMin,
             max: logMax,
-            title: { display: true, text: 'Blended Cost per 1M Tokens ($, log scale)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
+            title: { display: true, text: 'Blended Cost per 1M Tokens ($, log scale)', font: { size: 11, family: 'Archivo, system-ui, sans-serif' }, color: '#47514c' },
             ticks: {
-              color: '#6b6a65',
-              font: { size: 10 },
+              color: '#6d7772',
+              font: { size: 10, family: 'IBM Plex Mono, monospace' },
               callback: v => {
                 const mantissa = Math.round((v / Math.pow(10, Math.floor(Math.log10(v) + 1e-9))) * 100) / 100;
                 const show = mantissa === 1 || (!compact && (mantissa === 2 || mantissa === 5));
                 return show ? '$' + Number(v).toLocaleString(undefined, { maximumSignificantDigits: 3 }) : '';
               },
             },
-            grid: { color: '#e1e0d9', lineWidth: 1 },
-            border: { color: '#c3c2b7' },
+            grid: { color: '#dde3df', lineWidth: 1 },
+            border: { color: '#c6cec9' },
           } : {
             type: 'linear',
             min: 0,
             max: maxY,
-            title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
-            ticks: { color: '#6b6a65', font: { size: 10 }, callback: v => '$' + fmt(v, maxY >= 10 ? 0 : 2) },
-            grid: { color: '#e1e0d9', lineWidth: 1 },
-            border: { color: '#c3c2b7' },
+            title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'Archivo, system-ui, sans-serif' }, color: '#47514c' },
+            ticks: { color: '#6d7772', font: { size: 10, family: 'IBM Plex Mono, monospace' }, callback: v => '$' + fmt(v, maxY >= 10 ? 0 : 2) },
+            grid: { color: '#dde3df', lineWidth: 1 },
+            border: { color: '#c6cec9' },
           },
         },
         plugins: {
@@ -1745,8 +1812,8 @@
             display: !compact,
             position: 'bottom',
             labels: {
-              font: { size: 10, family: 'system-ui' },
-              color: '#52514e',
+              font: { size: 10, family: 'Archivo, system-ui, sans-serif' },
+              color: '#47514c',
               usePointStyle: true,
               pointStyle: 'line',
               boxWidth: 18,
@@ -1754,15 +1821,15 @@
             },
           },
           tooltip: {
-            backgroundColor: '#fcfcfb',
-            titleColor: '#0b0b0b',
-            bodyColor: '#52514e',
-            borderColor: '#c3c2b7',
+            backgroundColor: '#fbfcfa',
+            titleColor: '#141917',
+            bodyColor: '#47514c',
+            borderColor: '#c6cec9',
             borderWidth: 1,
-            cornerRadius: 4,
+            cornerRadius: 2,
             padding: 8,
-            titleFont: { size: 11, weight: '700', family: 'system-ui' },
-            bodyFont: { size: 10, family: 'system-ui' },
+            titleFont: { size: 11, weight: '700', family: 'Archivo, system-ui, sans-serif' },
+            bodyFont: { size: 10, family: 'Archivo, system-ui, sans-serif' },
             callbacks: {
               title: items => `Utilization: ${items[0].parsed.x}%`,
               label: item => {
@@ -1788,7 +1855,7 @@
               ctx.save();
               ctx.beginPath();
               ctx.arc(x, y, 6, 0, Math.PI * 2);
-              ctx.fillStyle = '#fcfcfb';
+              ctx.fillStyle = '#fbfcfa';
               ctx.fill();
               ctx.beginPath();
               ctx.arc(x, y, 4, 0, Math.PI * 2);
@@ -1797,7 +1864,7 @@
               // Percentage labels collide on narrow charts; the table keeps them.
               if (!compact) {
                 ctx.fillStyle = m.color;
-                ctx.font = '600 10px system-ui';
+                ctx.font = '500 10px "IBM Plex Mono", monospace';
                 const text = Math.round(m.breakeven) + '%';
                 const width = ctx.measureText(text).width;
                 const scenarioX = xScale.getPixelForValue(Math.min(derivedUtil, 100));
@@ -1831,24 +1898,28 @@
             // Dot on the curve
             if (scenarioCost <= maxY) {
               const y = yScale.getPixelForValue(scenarioCost);
+
+              // Back the label with sheet colour so it stays legible over API lines.
+              ctx.font = '500 11px "Archivo", sans-serif';
+              const label = overloaded ? 'Capacity limit: 100% (demand exceeds capacity)' : `Your scenario: ${fmt(clampedUtil, 1)}%`;
+              const labelWidth = ctx.measureText(label).width;
+              const labelX = x + 10 + labelWidth > xScale.right ? x - labelWidth - 10 : x + 10;
+              ctx.fillStyle = 'rgba(251,252,250,0.92)';
+              ctx.fillRect(labelX - 3, y - 21, labelWidth + 6, 28);
+              ctx.fillStyle = SELF_HOSTED_COLOR;
+              ctx.fillText(label, labelX, y - 10);
+              ctx.font = '500 10px "IBM Plex Mono", monospace';
+              ctx.fillText(`$${fmt(scenarioCost, 2)}/M`, labelX, y + 2);
+
+              // Redraw the dot over the backing rectangle.
               ctx.beginPath();
               ctx.arc(x, y, 7, 0, Math.PI * 2);
-              ctx.fillStyle = '#fcfcfb';
+              ctx.fillStyle = '#fbfcfa';
               ctx.fill();
               ctx.beginPath();
               ctx.arc(x, y, 5, 0, Math.PI * 2);
               ctx.fillStyle = SELF_HOSTED_COLOR;
               ctx.fill();
-
-              // Label
-              ctx.fillStyle = SELF_HOSTED_COLOR;
-              ctx.font = '700 10px system-ui';
-              const label = overloaded ? 'Capacity limit: 100% (demand exceeds capacity)' : `Your scenario: ${fmt(clampedUtil, 1)}%`;
-              const labelWidth = ctx.measureText(label).width;
-              const labelX = x + 10 + labelWidth > xScale.right ? x - labelWidth - 10 : x + 10;
-              ctx.fillText(label, labelX, y - 10);
-              ctx.font = '600 9px system-ui';
-              ctx.fillText(`$${fmt(scenarioCost, 2)}/M`, labelX, y + 2);
             }
 
             ctx.restore();
@@ -1866,7 +1937,7 @@
       tr.innerHTML = `
         <td><span class="swatch" style="background:${m.color};"></span>${esc(m.name)}</td>
         <td>$${fmt(m.blended)}</td>
-        <td style="font-weight: 700;">${bePct}</td>
+        <td>${bePct}</td>
         <td>${fmtDollar(m.monthlyFrontierCost)}</td>
       `;
       tbody.appendChild(tr);
@@ -1901,9 +1972,9 @@
     // No free-text scenario name anymore: measured presets carry their own
     // label; a custom setup is titled by model and hardware.
     const reportTitle = activePreset
-      ? activePreset.label
+      ? displayPresetLabel(activePreset)
       : `${selectedModel} on ${gpuType}`;
-    const titleHtml = `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">${esc(reportTitle)}</h1>`;
+    const titleHtml = `<h1 style="font-family:'Archivo',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;margin:0 0 2px;">${esc(reportTitle)}</h1>`;
 
     const rows = [
       ['Self-Hosted Model', selectedModel],
@@ -1937,7 +2008,7 @@
 
     const paramHtml = rows.map(([k, v]) => {
       if (!k && !v) return '<tr style="height:6px;"></tr>';
-      return `<tr><td style="color:#52514e;padding:2px 12px 2px 0;font-size:11px;white-space:nowrap;">${esc(k)}</td><td style="font-weight:700;font-size:11px;padding:2px 0;">${esc(String(v))}</td></tr>`;
+      return `<tr><td style="color:#47514c;padding:2px 12px 2px 0;font-size:11px;white-space:nowrap;">${esc(k)}</td><td style="font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:11px;padding:2px 0;color:#141917;">${esc(String(v))}</td></tr>`;
     }).join('');
 
     const breakevenHtml = $('breakevenBody').innerHTML;
@@ -1946,36 +2017,36 @@
     $('printContent').innerHTML = `
       ${titleHtml}
       ${$('inputErrors').hidden ? '' : `<p>${esc($('inputErrors').textContent)}</p>`}
-      <p style="font-size:11px;color:#6b6a65;margin:0 0 8px;">${new Date().toLocaleDateString()}</p>
-      <p style="font-size:12px;line-height:1.5;color:#0b0b0b;background:#f9f9f7;border:1px solid #e1e0d9;border-radius:6px;padding:8px 10px;margin:0 0 16px;">${esc($('verdictText').textContent)}</p>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6d7772;margin:0 0 10px;">${new Date().toLocaleDateString()}</p>
+      <p style="font-size:13px;line-height:1.5;color:#141917;background:#fbfcfa;border-top:1px solid #141917;border-bottom:1px solid #c6cec9;padding:9px 0;margin:0 0 18px;">${esc($('verdictText').textContent)}</p>
 
       <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
         <div>
-          <div style="font-size:11px;font-weight:700;color:#52514e;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e1e0d9;padding-bottom:4px;margin-bottom:8px;">Parameters</div>
+          <div style="font-size:12.5px;font-weight:600;color:#141917;border-bottom:1px solid #141917;padding-bottom:5px;margin-bottom:8px;">Parameters</div>
           <table style="border-collapse:collapse;">${paramHtml}</table>
         </div>
         <div>
-          ${chartImg ? `<img src="${chartImg}" alt="Cost comparison chart" style="width:100%;border:1px solid #e1e0d9;border-radius:6px;" />` : `<p>${esc($('chartStatus').textContent)}</p>`}
+          ${chartImg ? `<img src="${chartImg}" alt="Cost comparison chart" style="width:100%;border:1px solid #c6cec9;" />` : `<p>${esc($('chartStatus').textContent)}</p>`}
         </div>
       </div>
 
-      <div style="margin-top:20px;">
-        <div style="font-size:11px;font-weight:700;color:#52514e;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e1e0d9;padding-bottom:4px;margin-bottom:8px;">Breakeven Summary</div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <div style="margin-top:22px;">
+        <div style="font-size:12.5px;font-weight:600;color:#141917;border-bottom:1px solid #141917;padding-bottom:5px;margin-bottom:8px;">Breakeven summary</div>
+        <table class="print-breakeven" style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:10.5px;">
           <thead>
             <tr>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Frontier Model</th>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Blended $/M</th>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Breakeven Util.</th>
-              <th style="text-align:left;font-size:10px;color:#898781;font-weight:600;padding:3px 6px;border-bottom:1px solid #c3c2b7;">Monthly API Bill at Estimated Demand</th>
+              <th style="text-align:left;font-family:'Archivo',sans-serif;font-size:10px;color:#6d7772;font-weight:400;padding:3px 6px;border-bottom:1px solid #c6cec9;">Frontier model</th>
+              <th style="text-align:right;font-family:'Archivo',sans-serif;font-size:10px;color:#6d7772;font-weight:400;padding:3px 6px;border-bottom:1px solid #c6cec9;">Blended $/M</th>
+              <th style="text-align:right;font-family:'Archivo',sans-serif;font-size:10px;color:#6d7772;font-weight:400;padding:3px 6px;border-bottom:1px solid #c6cec9;">Breakeven util.</th>
+              <th style="text-align:right;font-family:'Archivo',sans-serif;font-size:10px;color:#6d7772;font-weight:400;padding:3px 6px;border-bottom:1px solid #c6cec9;">Monthly API bill at estimated demand</th>
             </tr>
           </thead>
           <tbody>${breakevenHtml}</tbody>
         </table>
       </div>
 
-      <p style="font-size:9px;color:#898781;text-align:center;margin-top:16px;">
-        Generated by Self-Hosted vs Frontier API Cost Comparison &mdash; ${esc($('frontierLoading').textContent)}
+      <p style="font-size:9.5px;color:#6d7772;margin-top:18px;border-top:1px solid #c6cec9;padding-top:8px;">
+        Generated by Self-Hosted vs Frontier API Cost Comparison. ${esc($('frontierLoading').textContent)}
         ${frontierModels.some(m => m.editedPrices.size) ? ' Includes manually edited prices.' : ''}
       </p>
     `;

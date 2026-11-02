@@ -10,6 +10,8 @@ test.beforeEach(async ({ page }) => {
     const url = route.request().url();
     if (url.startsWith('http://127.0.0.1:4173/')) return route.continue();
     if (url.includes('chart.umd.min.js')) return route.fulfill({ contentType: 'application/javascript', body: chartJs });
+    if (url.startsWith('https://fonts.googleapis.com/')) return route.fulfill({ contentType: 'text/css', body: '' });
+    if (url.startsWith('https://fonts.gstatic.com/')) return route.abort();
     if (url.includes('openrouter.ai/api/v1/models')) return route.fulfill({ json: { data: [] } });
     if (url.includes('huggingface.co/api/models')) return route.fulfill({ json: [{ id: 'test/reference-model', downloads: 1000 }] });
     throw new Error(`Unexpected external request: ${url}`);
@@ -43,14 +45,16 @@ test('invalid inputs and capacity limits cannot masquerade as feasible costs', a
   await expect(page.locator('#inputErrors')).toContainText('between 0 and 100');
   await expect(page.locator('#shCostAtUtil')).toHaveText('N/A');
   await expect(page.locator('#breakevenBody tr')).toHaveCount(0);
+  await expect(page.locator('.chart-canvas-holder')).toBeHidden();
   await page.locator('#cacheHitRate').fill('87');
+  await expect(page.locator('.chart-canvas-holder')).toBeVisible();
   await page.locator('#totalGoodput').fill('0');
   await expect(page.locator('#derivedUtil')).toContainText('no capacity');
   await expect(page.locator('#shCostPerM')).toHaveText('N/A');
   await expect(page.locator('#breakevenBody tr')).toHaveCount(5);
   await page.locator('#totalGoodput').fill('96000');
   await page.locator('#sessionsPerDay').fill('10');
-  await expect(page.locator('#derivedUtil')).toHaveText('684.6% — exceeds capacity');
+  await expect(page.locator('#derivedUtil')).toHaveText('684.6% (exceeds capacity)');
   await expect(page.locator('#shCostAtUtil')).toContainText('insufficient capacity');
   const annotations = await page.evaluate(() => {
     const chart = Chart.getChart(document.querySelector('#costChart'));
@@ -68,8 +72,8 @@ test('invalid inputs and capacity limits cannot masquerade as feasible costs', a
 test('native PDF printing builds a fresh report and captures a rendered chart', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.pdf({ path: testInfo.outputPath('first-report.pdf'), printBackground: true });
-  await expect(page.locator('#printContent h1')).toHaveText('GLM-5.2 · B200 · 155k:1k ISL:OSL, 92.8% cache');
-  await expect(page.locator('#printContent')).toContainText('Monthly API Bill at Estimated Demand');
+  await expect(page.locator('#printContent h1')).toHaveText('GLM-5.2, B200, 155k:1k ISL:OSL, 92.8% cache');
+  await expect(page.locator('#printContent')).toContainText('Monthly API bill at estimated demand');
   expect(await page.locator('#printContent img').getAttribute('src')).toMatch(/^data:image\/png;base64,.{100,}/);
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('#printContent')).toBeVisible();
@@ -92,7 +96,7 @@ test('API and CDN failures leave numerical output and printing usable', async ({
   await expect(page.locator('#breakevenBody tr')).toHaveCount(5);
   await page.locator('#numUsers').fill('400');
   await expect(page.locator('#monthlyDemand')).toHaveText('345.7B tokens/month');
-  await page.getByRole('button', { name: 'Print', exact: true }).click();
+  await page.getByRole('button', { name: 'Print report', exact: true }).click();
   await expect(page.locator('#printContent')).toContainText('Chart unavailable');
   await expect(page.locator('#printContent tbody tr')).not.toHaveCount(0);
 });
@@ -123,7 +127,7 @@ test('mobile header controls fit the viewport and visible inputs have accessible
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
-test('frontier pricing lives in the desktop rail and stacks below 1200px', async ({ page }) => {
+test('frontier pricing lives in the desktop rail and stacks below 1320px', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await expect(page).toHaveTitle('Self-Hosted vs Frontier API Cost Comparison');
@@ -199,7 +203,7 @@ test('preset provenance follows benchmark edits, and model search supports keybo
   await page.locator('#totalGoodput').fill('1000');
   await expect(page.locator('#presetSelect')).toHaveValue('custom');
   await expect(page.locator('#presetProvenance')).toBeHidden();
-  await page.getByLabel('Model (search HuggingFace)', { exact: true }).fill('reference');
+  await page.getByLabel('Model', { exact: true }).fill('reference');
   const result = page.getByRole('button', { name: /test\/reference-model/ });
   await result.focus();
   await page.keyboard.press('Enter');

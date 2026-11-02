@@ -137,7 +137,7 @@ test('every preset maps all benchmark fields and preserves edited demand inputs'
   const verify = preset => {
     for (const [id, value] of Object.entries({ ...preset.values, ...demand })) assert.equal(app.$(id).value, String(value), `${preset.id}: ${id}`);
     assert.equal(app.$('hfSearch').value, preset.source.model);
-    assert.equal(app.$('presetSelect').selectedOptions[0].textContent, preset.label);
+    assert.equal(app.$('presetSelect').selectedOptions[0].textContent, preset.label.replace(/\s·\s/g, ', '));
     assert(app.$('presetProvenance').classList.contains('open'));
     const r = app.compute();
     near(r.monthlyDemand, 300000 * (preset.values.avgIsl + preset.values.avgOsl));
@@ -171,7 +171,7 @@ test('at-a-glance verdict reflects demand, capacity and model selection states',
 
   app.compute();
   assert.match(verdict(), /below every enabled frontier API/);
-  assert.match(verdict(), /Nearest is GPT-6\.1 Terra/);
+  assert.match(verdict(), /The nearest is GPT-6\.1 Terra/);
   assert.notEqual(app.$('verdictSelfHosted').textContent, 'N/A');
   assert.match(app.$('verdictBestApi').textContent, /^\$\S+\/M$/);
   assert.match(app.$('verdictBills').textContent, /^\$/);
@@ -268,7 +268,7 @@ test('native print regenerates current values, including zero demand and invalid
   const app = await createApp(t);
   const print = () => app.window.dispatchEvent(new app.window.Event('beforeprint'));
   print();
-  assert(app.$('printContent').textContent.includes('Monthly API Bill at Estimated Demand'));
+  assert(app.$('printContent').textContent.includes('Monthly API bill at estimated demand'));
   assert(!app.$('printOverlay').classList.contains('active'));
   app.set('numUsers', 0);
   print();
