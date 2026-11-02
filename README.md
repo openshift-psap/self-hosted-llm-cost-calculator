@@ -1,4 +1,4 @@
-# Self-Hosted vs Frontier API LLM Cost Calculator
+# Self-Hosted vs Frontier API Cost Comparison
 
 Interactive tool for comparing the economics of self-hosted open-weight model inference against frontier API providers.
 
@@ -11,7 +11,7 @@ Calculates the blended cost per million tokens for a self-hosted GPU deployment 
 Key features:
 - **Live frontier pricing** fetched from the [OpenRouter API](https://openrouter.ai/api/v1/models) — no API key required
 - **Built-in pricing snapshot** for offline use and as a fallback when the API is unavailable
-- **Scenario presets** — measured operating points from [InferenceX](https://inferencex.semianalysis.com) agentic-traces benchmark runs (model × hardware, with provenance links), quick-select buttons for the top three
+- **Scenario presets in the header** — measured operating points from [InferenceX](https://inferencex.semianalysis.com) agentic-traces benchmark runs (model × hardware, with provenance links), quick-select buttons for the top three, and the page opens on GLM-5.2 on B200
 - **At-a-glance verdict** — the self-hosted $/M at your demand, the cheapest enabled API, monthly fleet vs API bills, utilization, and a plain-language conclusion are summarized above the chart
 - **Pricing beside the results** — frontier API pricing sits in a right-hand rail next to the chart on desktop, so you never scroll the input sidebar to check a price
 - **Optional log-scale chart** — spreads the long low-utilization tail and the $0.1–$2 comparison band across decades; linear remains the default
@@ -90,16 +90,22 @@ treated as zero. Benchmark measurements need not match input spinner step sizes.
 
 ## Default parameters
 
-The defaults model an agentic coding workload served by [llm-d](https://github.com/llm-d/llm-d) on 8 × IBM Cloud 8xH200 nodes (64 H200 GPUs):
+The page opens on the measured GLM-5.2 B200 operating point rather than an
+illustrative custom deployment:
 
 | Parameter | Default | Source |
 |---|---|---|
-| GPU nodes | 8 (8xH200 each) | IBM Cloud |
-| Cost/node/month | $11,597.84 | IBM Cloud public pricing |
-| Total goodput | 96,000 tok/s | aiperf benchmark (InferenceX CC-Traces Weka, c=128): 6,000 output tok/s at the workload's 15:1 mix |
-| Cache hit rate | 87% | Multi-turn agentic session prefix reuse |
-| Avg ISL | 30,000 tokens | Weka trace dataset |
-| Avg OSL | 2,000 tokens | Weka trace dataset |
+| GPU nodes | 1 node × 8 B200 | InferenceX run topology |
+| Cost/node/month | $21,608 | InferenceX rental $3.70/GPU-hr × 730 h × 8 GPUs |
+| Total goodput | 160,111 tok/s | InferenceX `total_tput_tps` (measured, input + output) |
+| Cache hit rate | 92.8% | `server_gpu_cache_hit_rate` from the same run |
+| Avg ISL | 155,205 tokens | `mean_input_tokens` from the same run |
+| Avg OSL | 997 tokens | `mean_output_tokens_actual` from the same run |
+| Output tok/s per user | 98.3 | `median_intvty` from the same run |
+| Concurrency | 32 | run `conc` |
+
+Demand keeps its usage assumptions (200 users, one session/user/day, 251.47
+model calls/session, 22 working days) — presets never change them.
 
 > Note: total goodput counts **all** tokens — input (cache hits included) plus
 > output — the same convention as InferenceX `total_tput_tps` and AIPerf's
@@ -107,7 +113,7 @@ The defaults model an agentic coding workload served by [llm-d](https://github.c
 
 ## Scenario presets
 
-The sidebar offers preset scenarios built from measured [InferenceX](https://inferencex.semianalysis.com)
+The header offers preset scenarios built from measured [InferenceX](https://inferencex.semianalysis.com)
 agentic-traces benchmark runs on vLLM- and SGLang-family serving stacks — real
 single runs with full provenance. Preset names carry the workload shape
 (ISL:OSL mix and measured cache hit rate); the serving framework is not shown

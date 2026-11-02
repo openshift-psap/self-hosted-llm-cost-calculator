@@ -5,28 +5,28 @@ import { createApp, flush } from './test-support.mjs';
 
 const near = (actual, expected) => assert(Math.abs(actual - expected) <= Math.max(1e-9, Math.abs(expected) * 1e-12), `${actual} != ${expected}`);
 const referenceModel = { id: 'test/reference', name: 'Reference API', inputPrice: 4, cachedPrice: 0.2, outputPrice: 20, checked: true };
-const monthlyDemand = 35406976000;
-const monthlyCost = 92782.72;
+const monthlyDemand = 172832514536;
+const monthlyCost = 21608;
 
 test('independent financial reference: cost, capacity, blend, bill, breakeven and curve', async t => {
   const app = await createApp(t);
   const r = app.calculateScenario(app.defaults, [referenceModel]);
   assert.equal(r.valid, true);
-  near(r.annualTco, 1113392.64);
+  near(r.annualTco, 259296);
   near(r.monthlyCost, monthlyCost);
-  near(r.annualTotalTokens, 3029529600000);
-  near(r.monthlySupply, 252460800000);
+  near(r.annualTotalTokens, 5052718893600);
+  near(r.monthlySupply, 421059907800);
   near(r.monthlySupply * 12, r.annualTotalTokens);
   near(r.monthlyDemand, monthlyDemand);
-  near(r.costPerMAt100, 1113392.64 / 3029529.6);
-  near(r.costAtDerivedUtil, monthlyCost / 35406.976);
-  near(r.derivedUtil, monthlyDemand / 252460800000 * 100);
-  near(r.frontierResults[0].blended, 1.900625);
-  near(r.frontierResults[0].monthlyFrontierCost, 35406.976 * 1.900625);
-  near(r.frontierResults[0].breakeven, (1113392.64 / 3029529.6) / 1.900625 * 100);
+  near(r.costPerMAt100, 259296 / 5052718.8936);
+  near(r.costAtDerivedUtil, monthlyCost / 172832.514536);
+  near(r.derivedUtil, monthlyDemand / 421059907800 * 100);
+  near(r.frontierResults[0].blended, 0.5982323401749019);
+  near(r.frontierResults[0].monthlyFrontierCost, 0.5982323401749019 * monthlyDemand / 1e6);
+  near(r.frontierResults[0].breakeven, (259296 / 5052718.8936) / 0.5982323401749019 * 100);
   assert.equal(r.selfHostedCosts.length, 100);
-  near(r.selfHostedCosts[0], 1113392.64 / 30295.296);
-  near(r.selfHostedCosts[49], 1113392.64 / 1514764.8);
+  near(r.selfHostedCosts[0], 259296 / 50527.188936);
+  near(r.selfHostedCosts[49], 259296 / 2526359.4468);
   near(r.selfHostedCosts[99], r.costPerMAt100);
 });
 
@@ -47,20 +47,20 @@ test('usage scaling, speed independence, capacity independence and cache-only bi
     near(r.monthlyDemand, monthlyDemand);
     near(r.costAtDerivedUtil, baseline.costAtDerivedUtil);
   }
-  const capacity = calc({ totalGoodput: 192000 });
+  const capacity = calc({ totalGoodput: 320222 });
   near(capacity.derivedUtil, baseline.derivedUtil / 2);
   near(capacity.costPerMAt100, baseline.costPerMAt100 / 2);
   near(capacity.costAtDerivedUtil, baseline.costAtDerivedUtil);
   near(capacity.frontierResults[0].monthlyFrontierCost, baseline.frontierResults[0].monthlyFrontierCost);
-  for (const [cacheHitRate, blended] of [[0, 5], [100, 1.4375]]) {
+  for (const [cacheHitRate, blended] of [[0, 4.102124172545806], [100, 0.326378663525435]]) {
     const r = calc({ cacheHitRate });
     near(r.monthlyDemand, monthlyDemand);
     near(r.monthlySupply, baseline.monthlySupply);
     near(r.costPerMAt100, baseline.costPerMAt100);
     near(r.frontierResults[0].blended, blended);
   }
-  near(calc({ avgOsl: 1000 }).monthlyDemand, 34300508000);
-  near(calc({ avgIsl: 60000 }).monthlyDemand, 68601016000);
+  near(calc({ avgOsl: 1000 }).monthlyDemand, 172835833940);
+  near(calc({ avgIsl: 60000 }).monthlyDemand, 67491228596);
 });
 
 test('zero demand, zero capacity, exact capacity and overload are distinct', async t => {
@@ -125,7 +125,7 @@ test('both pinned Weka references change only calls/session', async t => {
     buttons[index].click();
     assert.equal(Number(app.$('callsPerSession').value), expected);
     for (const [el, value] of before) if (el.id !== 'callsPerSession') assert.equal(el.value, value, el.id);
-    near(app.compute().monthlyDemand, 200 * 0.5 * expected * 22 * 32000);
+    near(app.compute().monthlyDemand, 200 * 0.5 * expected * 22 * 156202);
   }
 });
 
@@ -137,7 +137,7 @@ test('every preset maps all benchmark fields and preserves edited demand inputs'
   const verify = preset => {
     for (const [id, value] of Object.entries({ ...preset.values, ...demand })) assert.equal(app.$(id).value, String(value), `${preset.id}: ${id}`);
     assert.equal(app.$('hfSearch').value, preset.source.model);
-    assert.equal(app.$('scenarioName').value, preset.label);
+    assert.equal(app.$('presetSelect').selectedOptions[0].textContent, preset.label);
     assert(app.$('presetProvenance').classList.contains('open'));
     const r = app.compute();
     near(r.monthlyDemand, 300000 * (preset.values.avgIsl + preset.values.avgOsl));
@@ -161,8 +161,8 @@ test('frontier pricing is part of the main results column, not the input sidebar
   assert.ok(aside.closest('.main'));
   assert.equal(aside.closest('.sidebar'), null);
   assert.ok(aside.querySelector('#frontierList'));
-  assert.equal(doc.title, 'Self-Hosted vs Frontier API LLM Cost Calculator');
-  assert.equal(doc.querySelector('h1').textContent, 'Self-Hosted vs Frontier API Cost Calculator');
+  assert.equal(doc.title, 'Self-Hosted vs Frontier API Cost Comparison');
+  assert.equal(doc.querySelector('h1').textContent, 'Self-Hosted vs Frontier API Cost Comparison');
 });
 
 test('at-a-glance verdict reflects demand, capacity and model selection states', async t => {
@@ -170,17 +170,18 @@ test('at-a-glance verdict reflects demand, capacity and model selection states',
   const verdict = () => app.$('verdictText').textContent;
 
   app.compute();
-  assert.match(verdict(), /cheapest enabled API/);
-  assert.match(verdict(), /Break-even with GPT-6\.1 Terra/);
+  assert.match(verdict(), /below every enabled frontier API/);
+  assert.match(verdict(), /Nearest is GPT-6\.1 Terra/);
   assert.notEqual(app.$('verdictSelfHosted').textContent, 'N/A');
   assert.match(app.$('verdictBestApi').textContent, /^\$\S+\/M$/);
   assert.match(app.$('verdictBills').textContent, /^\$/);
   assert.match(app.$('verdictBillsSub').textContent, /^vs \$/);
   assert.match(app.$('verdictBillsSub').textContent, /cheapest API/);
-  assert.match(app.$('verdictUtil').textContent, /^14/);
+  assert.match(app.$('verdictUtil').textContent, /^41\.0%/);
 
-  app.set('numUsers', 1400);
-  assert.match(verdict(), /below every enabled frontier API/);
+  app.set('numUsers', 20);
+  assert.match(verdict(), /is less expensive/);
+  assert.match(verdict(), /Break-even with GPT-6\.1 Terra/);
 
   app.set('numUsers', 0);
   assert.match(verdict(), /demand is zero/);
@@ -238,7 +239,6 @@ test('benchmark edits clear measured attribution; demand edits preserve it', asy
     app.set(id, id === 'gpuType' ? 'Custom GPU' : Number(app.$(id).value) + 1);
     assert.equal(app.$('presetSelect').value, 'custom', id);
     assert(!app.$('presetProvenance').classList.contains('open'));
-    assert.match(app.$('scenarioName').value, /^Custom/);
   }
 });
 
@@ -250,10 +250,10 @@ test('real DOM pricing edits, accordion state and checkbox selection affect outp
   expand.click();
   assert.equal(expand.getAttribute('aria-expanded'), 'true');
   for (const [field, value] of Object.entries({ inputPrice: 4, cachedPrice: 0.2, outputPrice: 20 })) app.set(`price-0-${field}`, value);
-  near(app.compute().frontierResults[0].blended, 1.900625);
+  near(app.compute().frontierResults[0].blended, 0.5982323401749019);
   app.set('price-0-cachedPrice', 1);
-  near(app.compute().frontierResults[0].blended, 2.553125);
-  assert.equal(app.$('blended-0').textContent, `$${(2.553125).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/M`);
+  near(app.compute().frontierResults[0].blended, 1.3358937785687766);
+  assert.equal(app.$('blended-0').textContent, `$${(1.3358937785687766).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/M`);
   const checkboxes = [...doc.querySelectorAll('.frontier-list input[type="checkbox"]')];
   assert.equal(checkboxes.length, app.models.length);
   checkboxes.forEach(cb => { if (cb.checked) cb.click(); });
@@ -274,7 +274,7 @@ test('native print regenerates current values, including zero demand and invalid
   print();
   assert.equal(app.$('shCostAtUtil').textContent, 'N/A');
   assert(app.$('printContent').textContent.includes('N/A/M tokens'));
-  app.$('scenarioName').value = '<script>test</script>';
+  app.set('gpuType', '<script>test</script>');
   app.$('btnPrint').click();
   assert.equal(app.$('printContent').querySelectorAll('script').length, 0);
   assert(app.$('printOverlay').classList.contains('active'));

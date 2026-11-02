@@ -121,8 +121,9 @@ assumption; do not infer it from benchmark duration or replay speed.
 ### Removed inputs (do not re-add)
 
 "Other $/month", "Pilot months", the peak-concurrent warning, the selected-model
-chip, and the separate output/prefill goodput fields were all removed by
-explicit user decision. TCO = nodes × $/node/month × 12.
+chip, the separate output/prefill goodput fields, and the free-text scenario
+name/description were all removed by explicit user decision.
+TCO = nodes × $/node/month × 12.
 
 ### Display rules
 
@@ -142,7 +143,16 @@ verdict sentence. Its wording is derived, never hardcoded: API-cheaper,
 self-hosted-cheaper, zero-demand, zero-capacity, overloaded, no-model-selected
 and invalid-input states are distinct. The sidebar "Results" panel mirrors the
 demand-based numbers and keeps the 100%-utilization floor and derivation below
-a divider. Input sections are native `<details>` accordions, open by default.
+a divider. Input sections are separate bordered, tinted `.section-card`s (model,
+infrastructure, workload, serving, demand, results); the collapsible ones are
+native `<details>` accordions, open by default. Validation messages live in a
+standalone alert card above them rather than inside the model card.
+
+The page opens on the `glm-5-2-b200` preset (`DEFAULT_PRESET_ID`): GLM-5.2 on
+one 8×B200 node. The hardcoded HTML values mirror that preset so the first paint
+does not flash stale defaults. Scenario presets sit in the header to the right
+of the title (featured quick-select buttons plus the full dropdown); the
+provenance caption stays in the Self-Hosted Model card.
 
 Frontier API pricing lives in a right-hand rail inside `.main` at ≥1200px
 (nested grid: content column + `clamp(280px, 21vw, 340px)`), so it is visible
@@ -203,9 +213,10 @@ floor" and picked dominated points off the frontier. Do not regress.
 | Output tok/s per user | `median_intvty` |
 | Concurrency | run `conc` |
 
-Presets set infrastructure, workload-shape, and serving fields — and the model
-search box. They **never** touch demand-estimate inputs (users, sessions/day,
-calls/session, working days), which retain the user's current values.
+Presets are selected from the header bar, set infrastructure, workload-shape,
+and serving fields — and the model search box. They **never** touch
+demand-estimate inputs (users, sessions/day, calls/session, working days),
+which retain the user's current values.
 Editing benchmark fields switches to Custom and clears measured attribution;
 demand edits do not. Missing/null/theoretical-only cache measurements are
 ineligible. Cache rates must be finite numbers in [0, 1].
@@ -313,3 +324,6 @@ avoid re-litigating them:
 8. "Latest date first" preset selection → Pareto-frontier selection.
 9. Speed-derived demand (active hours × generation duty cycle) → explicit
    sessions/user/day × model calls/session.
+10. Free-text scenario name/description inputs → removed; presets carry their
+    own label and the print title derives from the active preset or model +
+    hardware.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Self-Hosted vs Frontier API LLM Cost Calculator</title>
+<title>Self-Hosted vs Frontier API Cost Comparison</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -42,16 +42,25 @@
 
   .top-bar {
     flex: none;
-    padding: 12px 20px 10px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--gridline);
     background: var(--surface-1);
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: start;
+    gap: 24px;
   }
-  .top-bar > div { flex: 1; min-width: 0; }
-  .top-bar .btn-print { flex: none; margin-left: 10px; margin-top: 2px; }
+  .top-bar > .brand { min-width: 0; }
+  .top-bar .btn-print { align-self: start; margin-top: 2px; }
+
+  .preset-bar {
+    width: clamp(300px, 32vw, 540px);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-self: end;
+  }
 
   h1 {
     font-size: 18px;
@@ -62,7 +71,7 @@
   .subtitle {
     font-size: 12px;
     color: var(--text-secondary);
-    margin-bottom: 8px;
+    margin-bottom: 0;
   }
 
   .btn-print {
@@ -86,31 +95,6 @@
     border-color: var(--cat-1);
     color: var(--cat-1);
   }
-
-  .scenario-fields {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 2px;
-  }
-  .scenario-fields input, .scenario-fields textarea {
-    max-width: 100%;
-    padding: 4px 8px;
-    border: 1px solid var(--baseline);
-    border-radius: 3px;
-    font-size: 12px;
-    font-family: inherit;
-    background: var(--surface-1);
-    color: var(--text-primary);
-  }
-  .scenario-fields input:focus, .scenario-fields textarea:focus {
-    outline: none;
-    border-color: var(--cat-1);
-    box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
-  }
-  .scenario-fields input { width: 260px; }
-  .scenario-fields textarea { width: 400px; height: 28px; resize: vertical; }
 
   #printOverlay {
     display: none;
@@ -238,36 +222,61 @@
     border-bottom: 1px solid var(--baseline);
   }
 
-  /* Collapsible input sections. Native <details> keeps them keyboard accessible. */
-  .section {
-    border-top: 1px dashed var(--baseline);
-    margin-top: 10px;
+  /* Each input group is its own bordered card with a distinct, very light
+     background. Native <details> keeps the collapsible ones keyboard accessible. */
+  .section-card {
+    background: var(--card-bg, var(--surface-1));
+    border: 1px solid var(--card-border, var(--gridline));
+    border-radius: 10px;
+    padding: 0 14px 12px;
+    margin-bottom: 12px;
   }
-  .section > summary {
-    list-style: none;
-    cursor: pointer;
+  .section-card:last-child { margin-bottom: 0; }
+
+  .card-head,
+  .section-card > summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     font-size: 11px;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     text-transform: uppercase;
-    letter-spacing: 0.4px;
-    padding: 9px 0 7px;
+    letter-spacing: 0.5px;
+    padding: 12px 0 9px;
     user-select: none;
   }
-  .section > summary::-webkit-details-marker { display: none; }
-  .section > summary::after {
+  .section-card > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .section-card > summary::-webkit-details-marker { display: none; }
+  .section-card > summary::after {
     content: '▾';
     font-size: 10px;
     color: var(--text-muted);
     transition: transform 0.15s;
   }
-  .section:not([open]) > summary::after { transform: rotate(-90deg); }
-  .section > summary:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 2px; border-radius: 2px; }
-  .section[open] > summary { margin-bottom: 8px; }
-  .section[open] .field:last-child { margin-bottom: 2px; }
+  .section-card:not([open]) > summary::after { transform: rotate(-90deg); }
+  .section-card > summary:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 3px; border-radius: 4px; }
+  .section-card[open] > summary {
+    border-bottom: 1px solid var(--card-border, var(--gridline));
+    margin-bottom: 10px;
+  }
+  .section-card[open] > summary + * { margin-top: 0; }
+  .section-card[open] .field:last-child { margin-bottom: 2px; }
+
+  /* Section tints: light enough to keep AA text contrast, distinct enough to scan. */
+  .card-model    { --card-bg: #f4f7fc; --card-border: #dce5f2; }
+  .card-infra    { --card-bg: #f8f7f3; --card-border: #e6e3d9; }
+  .card-workload { --card-bg: #f3f8f5; --card-border: #dbe9e1; }
+  .card-serving  { --card-bg: #faf6ee; --card-border: #ece0c9; }
+  .card-demand   { --card-bg: #f7f4fa; --card-border: #e4dcf0; }
+  .card-results  { --card-bg: #fdf6f4; --card-border: #f1ddd7; }
+
+  .section-card .field input,
+  .section-card .field select { background: var(--surface-1); }
 
   .field { margin-bottom: 8px; }
   .field label {
@@ -405,12 +414,11 @@
 
   .preset-quick {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
-    margin-bottom: 8px;
   }
   .preset-quick button {
-    padding: 8px 5px;
+    padding: 7px 6px;
     font-size: 11px;
     font-weight: 600;
     font-family: inherit;
@@ -448,7 +456,9 @@
     font-size: 10.5px;
     color: var(--text-muted);
     line-height: 1.55;
-    margin-top: 8px;
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px dashed var(--baseline);
     display: none;
   }
   .preset-provenance.open { display: block; }
@@ -543,7 +553,16 @@
   }
   button:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 2px; }
   [aria-invalid="true"] { border-color: #b00020 !important; }
-  .input-errors { color: #b00020; font-size: 11px; margin-top: 8px; }
+  .input-errors {
+    color: #b00020;
+    font-size: 11.5px;
+    line-height: 1.45;
+    padding: 9px 11px;
+    margin-bottom: 12px;
+    background: #fff5f4;
+    border: 1px solid #f3c9c4;
+    border-radius: 8px;
+  }
   .chart-status { font-size: 12px; color: var(--text-secondary); }
   .frontier-item.unchecked .frontier-row { opacity: 0.5; }
   .frontier-row input[type="checkbox"] {
@@ -696,9 +715,27 @@
     padding: 4px 0;
   }
 
+  @media (max-width: 1100px) {
+    .top-bar { gap: 16px; }
+    .preset-bar { width: clamp(280px, 30vw, 400px); }
+    .preset-quick button { font-size: 10.5px; padding: 6px 4px; }
+  }
+
   @media (max-width: 900px) {
-    .field input, .field select, .preset-select,
-    .scenario-fields input, .scenario-fields textarea { font-size: 16px; }
+    .top-bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px 14px;
+      padding: 12px 14px;
+    }
+    .top-bar .brand { grid-column: 1; grid-row: 1; }
+    .top-bar .btn-print { grid-column: 2; grid-row: 1; }
+    .preset-bar {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      width: 100%;
+      justify-self: stretch;
+    }
+    .field input, .field select, .preset-select { font-size: 16px; }
     .verdict-tile .v { font-size: 18px; }
     .main { padding: 14px; gap: 14px; }
     .sidebar { padding: 14px; }
@@ -722,14 +759,16 @@
 </head>
 <body>
 
-<div class="top-bar">
-  <div>
-    <h1>Self-Hosted vs Frontier API Cost Calculator</h1>
-    <div class="subtitle">Compare self-hosted cost per token with frontier APIs at your expected demand.</div>
-    <div class="scenario-fields">
-      <input type="text" id="scenarioName" aria-label="Scenario name" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
-      <textarea id="scenarioDesc" aria-label="Scenario description" placeholder="Description (optional)"></textarea>
-    </div>
+<header class="top-bar">
+  <div class="brand">
+    <h1>Self-Hosted vs Frontier API Cost Comparison</h1>
+    <p class="subtitle">Compare self-hosted cost per token with frontier APIs at your expected demand.</p>
+  </div>
+  <div class="preset-bar">
+    <div class="preset-quick" id="presetQuick" role="group" aria-label="Featured presets"></div>
+    <select id="presetSelect" class="preset-select" aria-label="Scenario preset">
+      <option value="custom">Custom — use current values</option>
+    </select>
   </div>
   <button class="btn-print" id="btnPrint">
     <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
@@ -737,7 +776,7 @@
     </svg>
     Print
   </button>
-</div>
+</header>
 
 <div id="printOverlay">
   <button class="print-actions" id="printNow">Print / Save PDF</button>
@@ -747,127 +786,120 @@
 
 <div class="layout">
 
-  <!-- SIDEBAR: all inputs -->
+  <!-- SIDEBAR: input sections, each in its own card -->
   <div class="sidebar">
 
-    <div class="panel">
-      <div class="panel-title">Scenario Preset</div>
-      <div class="preset-quick" id="presetQuick"></div>
-      <select id="presetSelect" class="preset-select" aria-label="Scenario preset">
-        <option value="custom">Custom — use current values</option>
-      </select>
-      <div class="preset-provenance" id="presetProvenance"></div>
-    </div>
+    <div id="inputErrors" class="input-errors" role="status" aria-live="polite" hidden></div>
 
-    <div class="panel">
-      <div class="panel-title">Self-Hosted Model</div>
+    <section class="section-card card-model" aria-labelledby="modelCardTitle">
+      <div class="card-head" id="modelCardTitle">Self-Hosted Model</div>
 
       <div class="field hf-search-wrap">
         <label for="hfSearch">Model (search HuggingFace)</label>
-        <input type="text" id="hfSearch" placeholder="Search models..." autocomplete="off">
+        <input type="text" id="hfSearch" placeholder="Search models..." autocomplete="off" value="GLM-5.2">
         <div class="hf-results" id="hfResults"></div>
       </div>
 
-      <details class="section" open>
-        <summary>Infrastructure</summary>
-        <div class="field-row">
-          <div class="field">
-            <label for="gpuType">GPU type</label>
-            <input type="text" id="gpuType" value="H200" placeholder="e.g. H200, H100, A100">
-          </div>
-          <div class="field">
-            <label for="gpusPerNode">GPUs per node</label>
-            <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="numNodes">Number of nodes</label>
-            <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
-          </div>
-          <div class="field">
-            <label for="costPerNode">$/node/month</label>
-            <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
-          </div>
-        </div>
-      </details>
+      <div class="preset-provenance" id="presetProvenance"></div>
+    </section>
 
-      <details class="section" open>
-        <summary>Workload Shape</summary>
-        <div class="field-row">
-          <div class="field">
-            <label for="concurrency">Concurrency (sessions)</label>
-            <input type="number" id="concurrency" value="128" min="1" step="1">
-          </div>
-          <div class="field">
-            <label for="cacheHitRate">Cache hit rate (%)</label>
-            <input type="number" id="cacheHitRate" value="87" min="0" max="100" step="1">
-          </div>
+    <details class="section-card card-infra" open>
+      <summary>Infrastructure</summary>
+      <div class="field-row">
+        <div class="field">
+          <label for="gpuType">GPU type</label>
+          <input type="text" id="gpuType" value="B200" placeholder="e.g. H200, H100, A100">
         </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="avgIsl">Avg ISL (tokens)</label>
-            <input type="number" id="avgIsl" value="30000" min="1" step="1000">
-          </div>
-          <div class="field">
-            <label for="avgOsl">Avg OSL (tokens)</label>
-            <input type="number" id="avgOsl" value="2000" min="1" step="100">
-          </div>
+        <div class="field">
+          <label for="gpusPerNode">GPUs per node</label>
+          <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
         </div>
-      </details>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="numNodes">Number of nodes</label>
+          <input type="number" id="numNodes" value="1" min="1" max="128" step="1">
+        </div>
+        <div class="field">
+          <label for="costPerNode">$/node/month</label>
+          <input type="number" id="costPerNode" value="21608" min="0" step="100">
+        </div>
+      </div>
+    </details>
 
-      <details class="section" open>
-        <summary>Serving Performance</summary>
-        <div class="field-row">
-          <div class="field">
-            <label for="totalGoodput">Total goodput (tok/s)</label>
-            <input type="number" id="totalGoodput" value="96000" min="0" step="100">
-          </div>
-          <div class="field">
-            <label for="outputTpsPerUser">Output tok/s per user</label>
-            <input type="number" id="outputTpsPerUser" value="32" min="0" step="1">
-          </div>
+    <details class="section-card card-workload" open>
+      <summary>Workload Shape</summary>
+      <div class="field-row">
+        <div class="field">
+          <label for="concurrency">Concurrency (sessions)</label>
+          <input type="number" id="concurrency" value="32" min="1" step="1">
         </div>
-      </details>
+        <div class="field">
+          <label for="cacheHitRate">Cache hit rate (%)</label>
+          <input type="number" id="cacheHitRate" value="92.8" min="0" max="100" step="0.1">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="avgIsl">Avg ISL (tokens)</label>
+          <input type="number" id="avgIsl" value="155205" min="1" step="1">
+        </div>
+        <div class="field">
+          <label for="avgOsl">Avg OSL (tokens)</label>
+          <input type="number" id="avgOsl" value="997" min="1" step="1">
+        </div>
+      </div>
+    </details>
 
-      <details class="section" open>
-        <summary>Demand Estimate</summary>
-        <div class="field-row">
-          <div class="field">
-            <label for="numUsers">Number of users</label>
-            <input type="number" id="numUsers" value="200" min="0" step="10">
-          </div>
-          <div class="field">
-            <label for="sessionsPerDay">Sessions / user / day</label>
-            <input type="number" id="sessionsPerDay" value="1" min="0" step="0.1">
-          </div>
+    <details class="section-card card-serving" open>
+      <summary>Serving Performance</summary>
+      <div class="field-row">
+        <div class="field">
+          <label for="totalGoodput">Total goodput (tok/s)</label>
+          <input type="number" id="totalGoodput" value="160111" min="0" step="1">
         </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="callsPerSession">Avg model calls / session</label>
-            <input type="number" id="callsPerSession" value="251.47" min="0" step="0.01">
-          </div>
-          <div class="field">
-            <label for="workDays">Working days / month</label>
-            <input type="number" id="workDays" value="22" min="1" max="31" step="1">
-          </div>
+        <div class="field">
+          <label for="outputTpsPerUser">Output tok/s per user</label>
+          <input type="number" id="outputTpsPerUser" value="98.3" min="0" step="0.1">
         </div>
-        <div class="demand-note">
-          Usage assumption, not benchmark data: a session may contain several tasks, and calls/session includes subagent calls.
-          Weka June 21 means (393 sessions):
-          <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
-          <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button>
-          (<a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
-          <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>).
-          These filtered coding traces favour longer sessions; presets never change this estimate.
-        </div>
-      </details>
+      </div>
+    </details>
 
-      <div id="inputErrors" class="input-errors" role="status" aria-live="polite" hidden></div>
-    </div>
+    <details class="section-card card-demand" open>
+      <summary>Demand Estimate</summary>
+      <div class="field-row">
+        <div class="field">
+          <label for="numUsers">Number of users</label>
+          <input type="number" id="numUsers" value="200" min="0" step="10">
+        </div>
+        <div class="field">
+          <label for="sessionsPerDay">Sessions / user / day</label>
+          <input type="number" id="sessionsPerDay" value="1" min="0" step="0.1">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="callsPerSession">Avg model calls / session</label>
+          <input type="number" id="callsPerSession" value="251.47" min="0" step="0.01">
+        </div>
+        <div class="field">
+          <label for="workDays">Working days / month</label>
+          <input type="number" id="workDays" value="22" min="1" max="31" step="1">
+        </div>
+      </div>
+      <div class="demand-note">
+        Usage assumption, not benchmark data: a session may contain several tasks, and calls/session includes subagent calls.
+        Weka June 21 means (393 sessions):
+        <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
+        <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button>
+        (<a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
+        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>).
+        These filtered coding traces favour longer sessions; presets never change this estimate.
+      </div>
+    </details>
 
-    <div class="panel" id="resultsPanel">
-      <div class="panel-title">Results</div>
+    <div class="section-card card-results" id="resultsPanel">
+      <div class="card-head">Results</div>
       <div class="results-grid">
         <div class="result">
           <span class="k">Avg utilization</span>
@@ -1078,6 +1110,9 @@
   ];
   // END SCENARIO_PRESETS
 
+  // The page opens on this measured operating point.
+  const DEFAULT_PRESET_ID = 'glm-5-2-b200';
+
   const DEFAULT_CHECKED = new Set(FRONTIER_MODELS.filter(m => m.checked).map(m => m.id));
 
   const $ = id => document.getElementById(id);
@@ -1198,7 +1233,6 @@
     $('outputTpsPerUser').value = v.outputTpsPerUser;
     selectedModel = preset.source.model;
     $('hfSearch').value = preset.source.model;
-    $('scenarioName').value = preset.label;
     render();
     const s = preset.source;
     presetProvenance.innerHTML =
@@ -1214,7 +1248,6 @@
   }
 
   function markCustomPreset() {
-    if (activePreset && $('scenarioName').value === activePreset.label) $('scenarioName').value = `Custom — based on ${activePreset.short}`;
     activePreset = null;
     presetSelect.value = 'custom';
     setActiveQuickButton(null);
@@ -1229,7 +1262,11 @@
       presetSelect.appendChild(opt);
     });
 
-    SCENARIO_PRESETS.filter(p => p.featured).slice(0, 3).forEach(p => {
+    // The page's default operating point leads the quick-select group so the
+    // active choice is the first thing in the header.
+    SCENARIO_PRESETS.filter(p => p.featured)
+      .sort((a, b) => Number(b.id === DEFAULT_PRESET_ID) - Number(a.id === DEFAULT_PRESET_ID))
+      .slice(0, 3).forEach(p => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.presetId = p.id;
@@ -1251,6 +1288,15 @@
       applyPreset(p);
       setActiveQuickButton(presetQuick.querySelector(`[data-preset-id="${p.id}"]`));
     });
+
+    // Open on a measured operating point rather than an arbitrary custom setup.
+    const initial = SCENARIO_PRESETS.find(p => p.id === DEFAULT_PRESET_ID)
+      || SCENARIO_PRESETS.find(p => p.featured);
+    if (initial) {
+      presetSelect.value = String(SCENARIO_PRESETS.indexOf(initial));
+      applyPreset(initial);
+      setActiveQuickButton(presetQuick.querySelector(`[data-preset-id="${initial.id}"]`));
+    }
   }
 
   // --- HuggingFace model search ---
@@ -1851,15 +1897,13 @@
     const gpusPerNode = val('gpusPerNode');
     const numNodes = val('numNodes');
     const totalGpus = numNodes * gpusPerNode;
-    const scenarioName = $('scenarioName').value.trim();
-    const scenarioDesc = $('scenarioDesc').value.trim();
 
-    const titleHtml = scenarioName
-      ? `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">${esc(scenarioName)}</h1>`
-      : `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">Self-Hosted vs Frontier API Cost Scenario</h1>`;
-    const descHtml = scenarioDesc
-      ? `<p style="font-size:12px;color:#52514e;margin:0 0 4px;">${esc(scenarioDesc)}</p>`
-      : '';
+    // No free-text scenario name anymore: measured presets carry their own
+    // label; a custom setup is titled by model and hardware.
+    const reportTitle = activePreset
+      ? activePreset.label
+      : `${selectedModel} on ${gpuType}`;
+    const titleHtml = `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">${esc(reportTitle)}</h1>`;
 
     const rows = [
       ['Self-Hosted Model', selectedModel],
@@ -1901,7 +1945,6 @@
 
     $('printContent').innerHTML = `
       ${titleHtml}
-      ${descHtml}
       ${$('inputErrors').hidden ? '' : `<p>${esc($('inputErrors').textContent)}</p>`}
       <p style="font-size:11px;color:#6b6a65;margin:0 0 8px;">${new Date().toLocaleDateString()}</p>
       <p style="font-size:12px;line-height:1.5;color:#0b0b0b;background:#f9f9f7;border:1px solid #e1e0d9;border-radius:6px;padding:8px 10px;margin:0 0 16px;">${esc($('verdictText').textContent)}</p>
@@ -1932,7 +1975,7 @@
       </div>
 
       <p style="font-size:9px;color:#898781;text-align:center;margin-top:16px;">
-        Generated by Self-Hosted vs Frontier API LLM Cost Calculator &mdash; ${esc($('frontierLoading').textContent)}
+        Generated by Self-Hosted vs Frontier API Cost Comparison &mdash; ${esc($('frontierLoading').textContent)}
         ${frontierModels.some(m => m.editedPrices.size) ? ' Includes manually edited prices.' : ''}
       </p>
     `;
@@ -1950,8 +1993,8 @@
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(render, 150);
   });
-  initPresets();
   useFallbackPricing();
+  initPresets();
   loadFrontierPricing();
 
 })();
