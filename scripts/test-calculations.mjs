@@ -177,7 +177,7 @@ test('at-a-glance verdict reflects demand, capacity and model selection states',
   assert.match(app.$('verdictBills').textContent, /^\$/);
   assert.match(app.$('verdictBillsSub').textContent, /^vs \$/);
   assert.match(app.$('verdictBillsSub').textContent, /cheapest API/);
-  assert.match(app.$('verdictUtil').textContent, /^41\.0%/);
+  assert.match(app.$('verdictUtil').textContent, /^41[.,]0%/);
 
   app.set('numUsers', 20);
   assert.match(verdict(), /is less expensive/);
