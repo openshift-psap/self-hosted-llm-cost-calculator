@@ -92,14 +92,28 @@
   .preset-bar {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    align-items: stretch;
+    gap: 2px;
     width: clamp(320px, 33vw, 520px);
     min-width: 0;
+  }
+  .preset-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .preset-label {
+    flex: none;
+    color: var(--ink-2);
+    font: 500 11.5px/1.2 var(--font-ui);
+    white-space: nowrap;
+    cursor: pointer;
   }
   .preset-quick {
     display: flex;
     flex-wrap: wrap;
+    flex: 1;
     justify-content: flex-end;
     gap: 0 2px;
   }
@@ -826,8 +840,11 @@
     <p class="subtitle">Price a measured self-hosted deployment against frontier APIs at your demand.</p>
   </div>
   <div class="preset-bar">
-    <div class="preset-quick" id="presetQuick" role="group" aria-label="Featured operating points"></div>
-    <select id="presetSelect" class="preset-select" aria-label="All operating points">
+    <div class="preset-head">
+      <label class="preset-label" for="presetSelect">Presets</label>
+      <div class="preset-quick" id="presetQuick" role="group" aria-label="Featured presets"></div>
+    </div>
+    <select id="presetSelect" class="preset-select">
       <option value="custom">Custom: use current values</option>
     </select>
   </div>
@@ -1046,7 +1063,7 @@
     <p class="footer-note">
       Pricing from <a href="https://openrouter.ai">OpenRouter</a> (live, with an offline snapshot).
       Models from <a href="https://huggingface.co">HuggingFace</a>.
-      Operating points from <a href="https://inferencex.semianalysis.com">InferenceX</a> benchmarks.
+      Presets from <a href="https://inferencex.semianalysis.com">InferenceX</a> benchmark runs.
       Blended cost reflects the ISL:OSL mix and measured cache hit rate.
     </p>
     </div>
