@@ -589,6 +589,28 @@
     display: flex;
     flex-direction: column;
   }
+  .chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--baseline);
+  }
+  .chart-head .panel-title { margin: 0; padding: 0; border: 0; }
+  .log-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .log-toggle input { margin: 0; accent-color: var(--cat-1); cursor: pointer; }
   .chart-canvas-holder {
     flex: 1;
     min-height: 280px;
@@ -886,7 +908,10 @@
     </section>
 
     <div class="chart-wrap">
-      <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
+      <div class="chart-head">
+        <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
+        <label class="log-toggle"><input type="checkbox" id="logScale"> Log scale</label>
+      </div>
       <p id="chartStatus" class="chart-status" role="status" hidden></p>
       <div class="chart-canvas-holder">
         <canvas id="costChart" role="img" aria-label="Self-hosted and API costs by utilization; numerical results are in the breakeven summary"></canvas>
@@ -1116,6 +1141,9 @@
     $('mathToggle').setAttribute('aria-expanded', String(detail.classList.contains('open')));
     $('mathToggle').textContent = detail.classList.contains('open') ? 'Hide derivation' : 'Show derivation';
   });
+
+  // Optional log-scale y-axis (linear remains the default).
+  $('logScale').addEventListener('change', render);
 
   // --- Scenario presets ---
   const presetSelect = $('presetSelect');
@@ -1549,6 +1577,14 @@
     const curveMax = selfHostedCosts[0] || 0;
     const maxY = Math.max(curveMax * 1.05, maxFrontier * 1.2) || 1;
 
+    // Optional log scale: pad the visible range to whole decades so both the
+    // low-utilization spike and the $0.1–$2 comparison band stay readable.
+    const logScale = $('logScale').checked;
+    const visibleCosts = [...frontierResults.map(f => f.blended), costPerMAt100, curveMax].filter(v => Number.isFinite(v) && v > 0);
+    const base = visibleCosts.length ? visibleCosts : [1];
+    const logMin = Math.pow(10, Math.floor(Math.log10(Math.max(Math.min(...base), 1e-4))));
+    const logMax = Math.max(Math.pow(10, Math.ceil(Math.log10(Math.max(...base)))), logMin * 10);
+
     const compact = window.innerWidth < 640;
     const datasets = [
       {
@@ -1597,10 +1633,27 @@
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },
           },
-          y: {
-            title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
+          y: logScale ? {
+            type: 'logarithmic',
+            min: logMin,
+            max: logMax,
+            title: { display: true, text: 'Blended Cost per 1M Tokens ($, log scale)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
+            ticks: {
+              color: '#6b6a65',
+              font: { size: 10 },
+              callback: v => {
+                const mantissa = Math.round((v / Math.pow(10, Math.floor(Math.log10(v) + 1e-9))) * 100) / 100;
+                const show = mantissa === 1 || (!compact && (mantissa === 2 || mantissa === 5));
+                return show ? '$' + Number(v).toLocaleString(undefined, { maximumSignificantDigits: 3 }) : '';
+              },
+            },
+            grid: { color: '#e1e0d9', lineWidth: 1 },
+            border: { color: '#c3c2b7' },
+          } : {
+            type: 'linear',
             min: 0,
             max: maxY,
+            title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
             ticks: { color: '#6b6a65', font: { size: 10 }, callback: v => '$' + fmt(v, maxY >= 10 ? 0 : 2) },
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },

@@ -130,8 +130,11 @@ All displayed values cap at 2 decimal places — **except cached input prices,
 which keep 3** (they can be sub-cent, e.g. $0.003/M). The chart y-axis
 auto-scales: `max(self-hosted curve at 1% util × 1.05, max frontier blended × 1.2)`,
 no fixed floor or cap. The x-axis is linear from 1–100% with 10-point ticks.
-Below 640px the chart hides its legend and breakeven percentage labels (the
-table retains them) to avoid collisions.
+The y-axis has an opt-in log-scale checkbox (off by default). Log mode pads the
+range to whole decades and labels ticks compactly so the low-utilization spike
+does not swamp the comparison band; the linear auto-scale rule above remains
+the default. Below 640px the chart hides its legend and breakeven percentage
+labels (the table retains them) to avoid collisions.
 
 The main column opens with an at-a-glance strip (self-hosted $/M at demand,
 cheapest enabled API, monthly fleet vs API bills, utilization) and a generated

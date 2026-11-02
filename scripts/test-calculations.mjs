@@ -196,6 +196,24 @@ test('at-a-glance verdict reflects demand, capacity and model selection states',
   assert.match(verdict(), /Correct the highlighted inputs/);
 });
 
+test('log scale toggle switches the chart y-axis; linear stays the default', async t => {
+  const app = await createApp(t);
+  const yAxis = () => app.getChart().config.options.scales.y;
+  assert.equal(yAxis().type, 'linear');
+  assert.equal(yAxis().min, 0);
+
+  app.$('logScale').checked = true;
+  app.$('logScale').dispatchEvent(new app.window.Event('change'));
+  assert.equal(yAxis().type, 'logarithmic');
+  assert(yAxis().min > 0);
+  assert(yAxis().max > yAxis().min);
+
+  app.$('logScale').checked = false;
+  app.$('logScale').dispatchEvent(new app.window.Event('change'));
+  assert.equal(yAxis().type, 'linear');
+  assert.equal(yAxis().min, 0);
+});
+
 test('benchmark edits clear measured attribution; demand edits preserve it', async t => {
   const app = await createApp(t);
   app.preset(0);

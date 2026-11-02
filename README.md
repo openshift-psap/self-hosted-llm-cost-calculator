@@ -13,6 +13,7 @@ Key features:
 - **Built-in pricing snapshot** for offline use and as a fallback when the API is unavailable
 - **Scenario presets** — measured operating points from [InferenceX](https://inferencex.semianalysis.com) agentic-traces benchmark runs (model × hardware, with provenance links), quick-select buttons for the top three
 - **At-a-glance verdict** — the self-hosted $/M at your demand, the cheapest enabled API, monthly fleet vs API bills, utilization, and a plain-language conclusion are summarized above the chart
+- **Optional log-scale chart** — spreads the long low-utilization tail and the $0.1–$2 comparison band across decades; linear remains the default
 - **HuggingFace model search** for labeling the self-hosted model
 - **Workload-aware blended cost** — accounts for the ISL:OSL token mix and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
 - **Measured capacity** — uses the fleet's measured total goodput directly, without extrapolating prefill/decode performance

@@ -124,6 +124,32 @@ test('mobile header controls fit the viewport and visible inputs have accessible
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
+test('log scale toggle reconfigures the y-axis and preserves annotations', async ({ page }) => {
+  await page.goto('/');
+  const scale = () => page.evaluate(() => {
+    const chart = Chart.getChart(document.querySelector('#costChart'));
+    return { type: chart.scales.y.type, min: chart.scales.y.min, max: chart.scales.y.max };
+  });
+  expect((await scale()).type).toBe('linear');
+  await page.getByLabel('Log scale').check();
+  await expect.poll(async () => (await scale()).type).toBe('logarithmic');
+  const log = await scale();
+  expect(log.min).toBeGreaterThan(0);
+  expect(log.max).toBeGreaterThan(log.min);
+  const labels = await page.evaluate(() => {
+    const chart = Chart.getChart(document.querySelector('#costChart'));
+    const out = [];
+    const original = chart.ctx.fillText;
+    chart.ctx.fillText = function(text, ...args) { out.push(text); return original.call(this, text, ...args); };
+    chart.stop(); chart.update('none');
+    chart.ctx.fillText = original;
+    return out;
+  });
+  expect(labels.some(text => String(text).startsWith('Your scenario'))).toBe(true);
+  await page.getByLabel('Log scale').uncheck();
+  await expect.poll(async () => (await scale()).type).toBe('linear');
+});
+
 test('at-a-glance verdict summarizes the comparison and reacts to demand', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#verdictText')).toContainText('cheapest enabled API');
