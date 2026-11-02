@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Self-Hosted LLM Cost Calculator</title>
+<title>Self-Hosted vs Frontier API LLM Cost Calculator</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -158,7 +158,7 @@
 
   .layout {
     display: grid;
-    grid-template-columns: clamp(360px, 32vw, 440px) minmax(0, 1fr);
+    grid-template-columns: clamp(320px, 26vw, 400px) minmax(0, 1fr);
     flex: 1;
     min-height: 0;
   }
@@ -185,9 +185,27 @@
   .main {
     overflow-y: auto;
     padding: 16px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 21vw, 340px);
+    grid-auto-rows: min-content;
+    align-content: start;
     gap: 16px;
+  }
+  /* Every direct child except the pricing rail sits in the wide left column. */
+  .main > :not(.frontier-aside) { grid-column: 1; }
+  .frontier-aside {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: start;
+    min-width: 0;
+  }
+
+  /* Below 1200px the rail stacks under the results column. */
+  @media (max-width: 1199px) {
+    .main { grid-template-columns: minmax(0, 1fr); }
+    .frontier-aside { grid-column: 1; grid-row: auto; }
+    /* Keep the provenance footnote at the very end once the rail stacks. */
+    .footer-note { order: 2; }
   }
 
   .panel {
@@ -197,7 +215,8 @@
     background: var(--surface-1);
   }
 
-  .sidebar .panel {
+  .sidebar .panel,
+  .frontier-aside .panel {
     margin-bottom: 16px;
     border: 1px solid var(--gridline);
     border-radius: 8px;
@@ -205,7 +224,8 @@
     background: var(--surface-1);
     box-shadow: 0 1px 2px rgba(11,11,11,0.03);
   }
-  .sidebar .panel:last-child { margin-bottom: 0; }
+  .sidebar .panel:last-child,
+  .frontier-aside .panel:last-child { margin-bottom: 0; }
 
   .panel-title {
     font-size: 11px;
@@ -345,6 +365,8 @@
     display: block;
     font-size: 10.5px;
     font-weight: 700;
+    line-height: 1.25;
+    min-height: 2.5em;
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-muted);
@@ -369,6 +391,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* The fleet-vs-API comparison is long; let it wrap instead of truncating. */
+  #verdictBillsSub { white-space: normal; overflow: visible; line-height: 1.3; }
   .verdict-text {
     margin-top: 12px;
     padding-top: 10px;
@@ -700,7 +724,7 @@
 
 <div class="top-bar">
   <div>
-    <h1>Self-Hosted LLM Cost Calculator</h1>
+    <h1>Self-Hosted vs Frontier API Cost Calculator</h1>
     <div class="subtitle">Compare self-hosted cost per token with frontier APIs at your expected demand.</div>
     <div class="scenario-fields">
       <input type="text" id="scenarioName" aria-label="Scenario name" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
@@ -871,12 +895,6 @@
       <div class="math-detail" id="mathExplanation"></div>
     </div>
 
-    <div class="panel">
-      <div class="panel-title">Frontier API Pricing</div>
-      <div id="frontierLoading" class="loading-msg" role="status">Using snapshot; checking OpenRouter...</div>
-      <ul class="frontier-list" id="frontierList"></ul>
-    </div>
-
   </div>
 
   <!-- MAIN: verdict, chart, breakeven -->
@@ -884,22 +902,22 @@
     <section class="verdict" aria-label="Results at a glance">
       <div class="verdict-tiles">
         <div class="verdict-tile">
-          <span class="k">Self-hosted at your demand</span>
+          <span class="k">Self-hosted at demand</span>
           <span class="v" id="verdictSelfHosted">—</span>
           <span class="sub">per 1M tokens</span>
         </div>
         <div class="verdict-tile">
-          <span class="k">Cheapest enabled API</span>
+          <span class="k">Cheapest API</span>
           <span class="v" id="verdictBestApi">—</span>
           <span class="sub" id="verdictBestApiSub">—</span>
         </div>
         <div class="verdict-tile">
-          <span class="k">Monthly: fleet vs API</span>
+          <span class="k">Monthly fleet bill</span>
           <span class="v small" id="verdictBills">—</span>
-          <span class="sub">fleet vs cheapest API</span>
+          <span class="sub" id="verdictBillsSub">vs cheapest API —</span>
         </div>
         <div class="verdict-tile">
-          <span class="k">Average utilization</span>
+          <span class="k">Utilization</span>
           <span class="v" id="verdictUtil">—</span>
           <span class="sub">of measured capacity</span>
         </div>
@@ -939,6 +957,14 @@
       Presets via <a href="https://inferencex.semianalysis.com" style="color: var(--cat-1);">InferenceX</a> benchmarks.
       Blended cost accounts for the ISL:OSL token mix and cache hit rate.
     </p>
+
+    <aside class="frontier-aside" aria-label="Frontier API pricing">
+      <div class="panel">
+        <div class="panel-title">Frontier API Pricing</div>
+        <div id="frontierLoading" class="loading-msg" role="status">Using snapshot; checking OpenRouter...</div>
+        <ul class="frontier-list" id="frontierList"></ul>
+      </div>
+    </aside>
   </div>
 
 </div>
@@ -1058,6 +1084,13 @@
   const val = id => $(id).value.trim() === '' ? NaN : Number($(id).value);
   const fmt = (n, d = 2) => Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : 'N/A';
   const fmtDollar = (n, d = 0) => Number.isFinite(n) ? '$' + fmt(n, d) : 'N/A';
+  // Compact currency for the at-a-glance tiles; exact values stay in Results.
+  const fmtCompactDollar = n => {
+    if (!Number.isFinite(n)) return 'N/A';
+    if (n >= 1e6) return '$' + fmt(n / 1e6, 1) + 'M';
+    if (n >= 1e3) return '$' + fmt(n / 1e3, 1) + 'k';
+    return fmtDollar(n);
+  };
   const INPUT_RULES = {
     gpusPerNode: { label: 'GPUs per node', min: 1, max: 144, integer: true },
     numNodes: { label: 'Number of nodes', min: 1, max: 128, integer: true },
@@ -1428,6 +1461,7 @@
       set('verdictBestApi', 'N/A');
       set('verdictBestApiSub', 'correct inputs');
       set('verdictBills', 'N/A');
+      set('verdictBillsSub', 'vs cheapest API —');
       $('verdictUtil').textContent = 'N/A';
       $('verdictUtil').classList.remove('warn');
       $('verdictText').textContent = 'Correct the highlighted inputs to compare self-hosting with frontier APIs.';
@@ -1439,7 +1473,8 @@
     set('verdictSelfHosted', costAtDerivedUtil === null ? 'N/A' : fmtDollar(costAtDerivedUtil, 2));
     set('verdictBestApi', best ? `${fmtDollar(best.blended, 2)}/M` : 'N/A');
     set('verdictBestApiSub', best ? best.name : 'enable a model');
-    set('verdictBills', `${fmtDollar(monthlyCost)} vs ${best ? fmtDollar(best.monthlyFrontierCost) : '—'}`);
+    set('verdictBills', fmtCompactDollar(monthlyCost));
+    set('verdictBillsSub', best ? `vs ${fmtCompactDollar(best.monthlyFrontierCost)} cheapest API` : 'vs cheapest API —');
     $('verdictUtil').textContent = utilText;
     $('verdictUtil').classList.toggle('warn', Boolean(overloaded));
 
@@ -1821,7 +1856,7 @@
 
     const titleHtml = scenarioName
       ? `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">${esc(scenarioName)}</h1>`
-      : `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">Self-Hosted LLM Cost Scenario</h1>`;
+      : `<h1 style="font-size:20px;font-weight:700;margin:0 0 2px;">Self-Hosted vs Frontier API Cost Scenario</h1>`;
     const descHtml = scenarioDesc
       ? `<p style="font-size:12px;color:#52514e;margin:0 0 4px;">${esc(scenarioDesc)}</p>`
       : '';
@@ -1897,7 +1932,7 @@
       </div>
 
       <p style="font-size:9px;color:#898781;text-align:center;margin-top:16px;">
-        Generated by Self-Hosted LLM Cost Calculator &mdash; ${esc($('frontierLoading').textContent)}
+        Generated by Self-Hosted vs Frontier API LLM Cost Calculator &mdash; ${esc($('frontierLoading').textContent)}
         ${frontierModels.some(m => m.editedPrices.size) ? ' Includes manually edited prices.' : ''}
       </p>
     `;

@@ -153,6 +153,18 @@ test('every preset maps all benchmark fields and preserves edited demand inputs'
   buttons.forEach(button => { button.click(); verify(app.presets.find(p => p.id === button.dataset.presetId)); });
 });
 
+test('frontier pricing is part of the main results column, not the input sidebar', async t => {
+  const app = await createApp(t);
+  const doc = app.window.document;
+  const aside = doc.querySelector('.frontier-aside');
+  assert.ok(aside);
+  assert.ok(aside.closest('.main'));
+  assert.equal(aside.closest('.sidebar'), null);
+  assert.ok(aside.querySelector('#frontierList'));
+  assert.equal(doc.title, 'Self-Hosted vs Frontier API LLM Cost Calculator');
+  assert.equal(doc.querySelector('h1').textContent, 'Self-Hosted vs Frontier API Cost Calculator');
+});
+
 test('at-a-glance verdict reflects demand, capacity and model selection states', async t => {
   const app = await createApp(t);
   const verdict = () => app.$('verdictText').textContent;
@@ -162,7 +174,9 @@ test('at-a-glance verdict reflects demand, capacity and model selection states',
   assert.match(verdict(), /Break-even with GPT-6\.1 Terra/);
   assert.notEqual(app.$('verdictSelfHosted').textContent, 'N/A');
   assert.match(app.$('verdictBestApi').textContent, /^\$\S+\/M$/);
-  assert.match(app.$('verdictBills').textContent, / vs /);
+  assert.match(app.$('verdictBills').textContent, /^\$/);
+  assert.match(app.$('verdictBillsSub').textContent, /^vs \$/);
+  assert.match(app.$('verdictBillsSub').textContent, /cheapest API/);
   assert.match(app.$('verdictUtil').textContent, /^14/);
 
   app.set('numUsers', 1400);

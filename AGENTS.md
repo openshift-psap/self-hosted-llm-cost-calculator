@@ -137,12 +137,18 @@ the default. Below 640px the chart hides its legend and breakeven percentage
 labels (the table retains them) to avoid collisions.
 
 The main column opens with an at-a-glance strip (self-hosted $/M at demand,
-cheapest enabled API, monthly fleet vs API bills, utilization) and a generated
+cheapest enabled API, monthly fleet bill, utilization) and a generated
 verdict sentence. Its wording is derived, never hardcoded: API-cheaper,
 self-hosted-cheaper, zero-demand, zero-capacity, overloaded, no-model-selected
 and invalid-input states are distinct. The sidebar "Results" panel mirrors the
 demand-based numbers and keeps the 100%-utilization floor and derivation below
 a divider. Input sections are native `<details>` accordions, open by default.
+
+Frontier API pricing lives in a right-hand rail inside `.main` at ≥1200px
+(nested grid: content column + `clamp(280px, 21vw, 340px)`), so it is visible
+without scrolling the sidebar; below 1200px it stacks under the breakeven table
+with the provenance footnote last. The rail is the same `#frontierList` panel —
+no separate pricing state.
 
 ## Frontier comparison rules
 

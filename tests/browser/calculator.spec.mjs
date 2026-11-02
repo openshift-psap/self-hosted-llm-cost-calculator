@@ -28,7 +28,7 @@ test('pricing controls are keyboard accessible and update real chart/table data'
   await page.locator('#price-0-inputPrice').fill('9');
   await expect(page.locator('#blended-0')).toHaveText('$2.51/M');
   expect(await page.evaluate(() => Chart.getChart(document.querySelector('#costChart')).data.datasets[1].data[0].y)).toBeCloseTo(2.51, 10);
-  await page.getByRole('checkbox').first().uncheck();
+  await page.locator('.frontier-list input[type="checkbox"]').first().uncheck();
   await expect(page.locator('#breakevenBody tr')).toHaveCount(4);
   const toggle = page.getByRole('button', { name: 'Show derivation' });
   await toggle.focus();
@@ -122,6 +122,33 @@ test('mobile header controls fit the viewport and visible inputs have accessible
   expect(await controls.count()).toBeGreaterThan(10);
   for (const control of await controls.all()) await expect(control).toHaveAccessibleName(/.+/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('frontier pricing lives in the desktop rail and stacks below 1200px', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page).toHaveTitle('Self-Hosted vs Frontier API LLM Cost Calculator');
+  await expect(page.locator('h1')).toHaveText('Self-Hosted vs Frontier API Cost Calculator');
+  const wide = await page.evaluate(() => {
+    const aside = document.querySelector('.frontier-aside');
+    const main = document.querySelector('.main');
+    const sidebar = document.querySelector('.sidebar');
+    return {
+      inMain: main.contains(aside),
+      inSidebar: sidebar.contains(aside),
+      top: Math.round(aside.getBoundingClientRect().top),
+      columns: getComputedStyle(main).gridTemplateColumns.split(' ').length,
+      firstModelVisible: Boolean(document.querySelector('.frontier-list input[type="checkbox"]')),
+    };
+  });
+  expect(wide.inMain).toBe(true);
+  expect(wide.inSidebar).toBe(false);
+  expect(wide.top).toBeLessThan(200);
+  expect(wide.columns).toBe(2);
+  expect(wide.firstModelVisible).toBe(true);
+
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.main')).gridTemplateColumns.split(' ').length)).toBe(1);
 });
 
 test('log scale toggle reconfigures the y-axis and preserves annotations', async ({ page }) => {
