@@ -52,14 +52,14 @@ const HOURS_PER_MONTH = 730;
 /**
  * Curated preset catalog, restricted to vLLM- and SGLang-family serving
  * stacks. `featured: true` marks the quick-select buttons shown directly in
- * the UI (first three are used).
+ * the UI (up to three are used).
  */
 const CURATED = [
-  { model: 'GLM-5.2', hardware: 'gb200', featured: true },
+  { model: 'GLM-5.2', hardware: 'gb200' },
   { model: 'Kimi-K3', hardware: 'tpuv7', featured: true },
   { model: 'Muse-Spark-Open', hardware: 'mi355x', featured: true },
   { model: 'GLM-5.2', hardware: 'h200' },
-  { model: 'GLM-5.2', hardware: 'b200' },
+  { model: 'GLM-5.2', hardware: 'b200', featured: true },
   { model: 'GLM-5.2', hardware: 'mi355x' },
   { model: 'GLM-5.2', hardware: 'gb300' },
   { model: 'Kimi-K3', hardware: 'mi355x' },

@@ -27,7 +27,7 @@ test('pricing controls are keyboard accessible and update real chart/table data'
   await page.locator('#price-0-outputPrice').fill('20');
   await page.locator('#price-0-inputPrice').fill('9');
   await expect(page.locator('#blended-0')).toHaveText('$2.51/M');
-  expect(await page.evaluate(() => Chart.getChart(document.querySelector('#costChart')).data.datasets[1].data[0])).toBeCloseTo(2.51, 10);
+  expect(await page.evaluate(() => Chart.getChart(document.querySelector('#costChart')).data.datasets[1].data[0].y)).toBeCloseTo(2.51, 10);
   await page.getByRole('checkbox').first().uncheck();
   await expect(page.locator('#breakevenBody tr')).toHaveCount(4);
   const toggle = page.getByRole('button', { name: 'Show derivation' });
@@ -124,12 +124,26 @@ test('mobile header controls fit the viewport and visible inputs have accessible
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
+test('at-a-glance verdict summarizes the comparison and reacts to demand', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#verdictText')).toContainText('cheapest enabled API');
+  await expect(page.locator('#verdictSelfHosted')).not.toHaveText('—');
+  await expect(page.locator('#verdictBestApi')).toContainText('/M');
+  await page.locator('#numUsers').fill('1400');
+  await expect(page.locator('#verdictText')).toContainText('below every enabled frontier API');
+  await page.locator('#numUsers').fill('0');
+  await expect(page.locator('#verdictText')).toContainText('demand is zero');
+  await expect(page.locator('#verdictSelfHosted')).toHaveText('N/A');
+});
+
 test('preset provenance follows benchmark edits, and model search supports keyboard selection', async ({ page }) => {
   await page.goto('/');
   await page.locator('#presetQuick button').first().click();
   await expect(page.locator('#presetProvenance')).toBeVisible();
+  const presetValue = await page.locator('#presetSelect').inputValue();
+  expect(presetValue).toMatch(/^\d+$/);
   await page.locator('#numUsers').fill('300');
-  await expect(page.locator('#presetSelect')).toHaveValue('0');
+  await expect(page.locator('#presetSelect')).toHaveValue(presetValue);
   await page.locator('#totalGoodput').fill('1000');
   await expect(page.locator('#presetSelect')).toHaveValue('custom');
   await expect(page.locator('#presetProvenance')).toBeHidden();

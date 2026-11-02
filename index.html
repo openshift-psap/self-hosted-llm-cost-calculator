@@ -11,10 +11,11 @@
     --page-plane: #f9f9f7;
     --text-primary: #0b0b0b;
     --text-secondary: #52514e;
-    --text-muted: #898781;
+    --text-muted: #6b6a65;
     --gridline: #e1e0d9;
     --baseline: #c3c2b7;
     --border: rgba(11,11,11,0.10);
+    --warn: #b00020;
     --self-hosted: #CC0000;
     --cat-1: #2a78d6;
     --cat-2: #eb6834;
@@ -41,40 +42,46 @@
 
   .top-bar {
     flex: none;
-    padding: 12px 20px 8px;
+    padding: 12px 20px 10px;
     border-bottom: 1px solid var(--gridline);
     background: var(--surface-1);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 12px;
   }
   .top-bar > div { flex: 1; min-width: 0; }
-  .top-bar .btn-print { flex: none; margin-left: 10px; }
+  .top-bar .btn-print { flex: none; margin-left: 10px; margin-top: 2px; }
 
   h1 {
     font-size: 18px;
     font-weight: 700;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
 
   .subtitle {
     font-size: 12px;
     color: var(--text-secondary);
+    margin-bottom: 8px;
   }
 
   .btn-print {
-    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
     font-size: 12px;
     font-weight: 600;
     font-family: inherit;
     color: var(--text-secondary);
     background: var(--surface-1);
     border: 1px solid var(--baseline);
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
     transition: border-color 0.15s, color 0.15s;
   }
+  .btn-print svg { width: 13px; height: 13px; flex: none; }
   .btn-print:hover {
     border-color: var(--cat-1);
     color: var(--cat-1);
@@ -151,7 +158,7 @@
 
   .layout {
     display: grid;
-    grid-template-columns: 440px minmax(0, 1fr);
+    grid-template-columns: clamp(360px, 32vw, 440px) minmax(0, 1fr);
     flex: 1;
     min-height: 0;
   }
@@ -170,7 +177,7 @@
 
   .sidebar {
     overflow-y: auto;
-    padding: 14px;
+    padding: 16px;
     border-right: 1px solid var(--gridline);
     background: var(--page-plane);
   }
@@ -180,21 +187,21 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
 
   .panel {
     border: 1px solid var(--gridline);
-    border-radius: 6px;
-    padding: 10px;
+    border-radius: 8px;
+    padding: 12px;
     background: var(--surface-1);
   }
 
   .sidebar .panel {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     border: 1px solid var(--gridline);
-    border-radius: 6px;
-    padding: 14px;
+    border-radius: 8px;
+    padding: 16px;
     background: var(--surface-1);
     box-shadow: 0 1px 2px rgba(11,11,11,0.03);
   }
@@ -206,36 +213,55 @@
     color: var(--text-primary);
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--baseline);
   }
 
-  .section-label {
-    font-size: 10px;
+  /* Collapsible input sections. Native <details> keeps them keyboard accessible. */
+  .section {
+    border-top: 1px dashed var(--baseline);
+    margin-top: 10px;
+  }
+  .section > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
     font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    margin: 14px 0 6px;
-    padding-bottom: 3px;
-    border-bottom: 1px dashed var(--baseline);
+    padding: 9px 0 7px;
+    user-select: none;
   }
-  .section-label:first-of-type { margin-top: 4px; }
-
-  .field { margin-bottom: 6px; }
-  .field label {
-    display: block;
+  .section > summary::-webkit-details-marker { display: none; }
+  .section > summary::after {
+    content: '▾';
     font-size: 10px;
     color: var(--text-muted);
-    margin-bottom: 1px;
+    transition: transform 0.15s;
+  }
+  .section:not([open]) > summary::after { transform: rotate(-90deg); }
+  .section > summary:focus-visible { outline: 2px solid var(--cat-1); outline-offset: 2px; border-radius: 2px; }
+  .section[open] > summary { margin-bottom: 8px; }
+  .section[open] .field:last-child { margin-bottom: 2px; }
+
+  .field { margin-bottom: 8px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
   }
   .field input, .field select {
     width: 100%;
-    padding: 4px 6px;
+    padding: 6px 8px;
     border: 1px solid var(--baseline);
-    border-radius: 3px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 13px;
     font-family: inherit;
     background: var(--surface-1);
     color: var(--text-primary);
@@ -249,38 +275,109 @@
   .field-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 8px;
   }
 
   .demand-note {
-    font-size: 9px;
+    font-size: 11px;
     color: var(--text-secondary);
     line-height: 1.5;
-    margin: 4px 0 8px;
+    margin: 6px 0 10px;
   }
   .demand-note a { color: var(--cat-1); }
   .demand-reference {
-    padding: 2px 5px;
-    margin: 3px 2px 0 0;
-    font: inherit;
+    padding: 3px 7px;
+    margin: 4px 2px 0 0;
+    font-size: 10.5px;
+    font-family: inherit;
     color: var(--cat-1);
     background: var(--page-plane);
     border: 1px solid var(--baseline);
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
   }
   .demand-reference:hover { border-color: var(--cat-1); }
 
-  .computed-box {
-    background: var(--page-plane);
-    border: 1px solid var(--gridline);
-    border-radius: 4px;
-    padding: 8px;
-    margin-top: 8px;
+  /* Results panel: the answer, promoted out of the inputs. */
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+  }
+  .result .k {
+    display: block;
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .result .v {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 1px;
+  }
+  .result .v.big { font-size: 17px; }
+  .result .v.warn { color: var(--warn); }
+  .result .unit { font-size: 10px; color: var(--text-muted); }
+  .results-divider {
+    border-top: 1px solid var(--gridline);
+    margin: 12px 0 10px;
+    padding-top: 8px;
     font-size: 11px;
     color: var(--text-secondary);
+    line-height: 1.6;
   }
-  .computed-box .val { font-weight: 700; color: var(--text-primary); }
+
+  /* At-a-glance verdict tiles at the top of the results column. */
+  .verdict {
+    background: var(--surface-1);
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .verdict-tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .verdict-tile { min-width: 0; }
+  .verdict-tile .k {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+  }
+  .verdict-tile .v {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 3px;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .verdict-tile .v.warn { color: var(--warn); }
+  .verdict-tile .v.small { font-size: 16px; }
+  .verdict-tile .sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .verdict-text {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--gridline);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .verdict-text strong { color: var(--text-primary); }
 
   .preset-quick {
     display: grid;
@@ -289,15 +386,15 @@
     margin-bottom: 8px;
   }
   .preset-quick button {
-    padding: 6px 4px;
-    font-size: 10px;
+    padding: 8px 5px;
+    font-size: 11px;
     font-weight: 600;
     font-family: inherit;
     line-height: 1.3;
     color: var(--text-secondary);
     background: var(--page-plane);
     border: 1px solid var(--baseline);
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
@@ -309,10 +406,10 @@
   }
   .preset-select {
     width: 100%;
-    padding: 5px 6px;
+    padding: 7px 8px;
     border: 1px solid var(--baseline);
-    border-radius: 3px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 13px;
     font-family: inherit;
     background: var(--surface-1);
     color: var(--text-primary);
@@ -324,10 +421,10 @@
     box-shadow: 0 0 0 2px rgba(42,120,214,0.15);
   }
   .preset-provenance {
-    font-size: 9px;
+    font-size: 10.5px;
     color: var(--text-muted);
-    line-height: 1.5;
-    margin-top: 6px;
+    line-height: 1.55;
+    margin-top: 8px;
     display: none;
   }
   .preset-provenance.open { display: block; }
@@ -339,19 +436,19 @@
     border: 0;
     padding: 0;
     font-family: inherit;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--cat-1);
     cursor: pointer;
     user-select: none;
-    margin-top: 4px;
+    margin-top: 6px;
     display: inline-block;
   }
   .math-toggle:hover { text-decoration: underline; }
   .math-detail {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-muted);
-    line-height: 1.5;
-    margin-top: 4px;
+    line-height: 1.55;
+    margin-top: 6px;
     display: none;
   }
   .math-detail.open { display: block; }
@@ -386,7 +483,7 @@
 
   .frontier-list { list-style: none; }
   .frontier-group {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -439,7 +536,7 @@
   }
   .frontier-row-main { flex: 1; min-width: 0; }
   .frontier-name { font-weight: 600; font-size: 11px; display: block; }
-  .frontier-row-prices { font-size: 9px; color: var(--text-muted); display: block; }
+  .frontier-row-prices { font-size: 10px; color: var(--text-muted); display: block; }
   .frontier-blended-val {
     font-size: 11px;
     font-weight: 700;
@@ -464,37 +561,37 @@
     margin-top: 3px;
   }
   .frontier-prices label {
-    font-size: 9px;
+    font-size: 10px;
     color: var(--text-muted);
   }
   .frontier-prices input {
     width: 100%;
-    padding: 2px 4px;
+    padding: 3px 5px;
     border: 1px solid var(--gridline);
-    border-radius: 2px;
-    font-size: 10px;
+    border-radius: 3px;
+    font-size: 11px;
     font-family: inherit;
   }
   .frontier-blended-math {
-    font-size: 9px;
+    font-size: 10px;
     color: var(--text-muted);
-    line-height: 1.4;
-    margin-top: 3px;
+    line-height: 1.45;
+    margin-top: 4px;
   }
 
   .chart-wrap {
     background: var(--surface-1);
     border: 1px solid var(--gridline);
-    border-radius: 6px;
-    padding: 14px;
+    border-radius: 8px;
+    padding: 16px;
     flex: 1;
-    min-height: 300px;
+    min-height: 320px;
     display: flex;
     flex-direction: column;
   }
   .chart-canvas-holder {
     flex: 1;
-    min-height: 260px;
+    min-height: 280px;
     position: relative;
   }
 
@@ -502,8 +599,8 @@
     overflow-x: auto;
     background: var(--surface-1);
     border: 1px solid var(--gridline);
-    border-radius: 6px;
-    padding: 14px;
+    border-radius: 8px;
+    padding: 16px;
   }
   .breakeven-table h3 {
     font-size: 11px;
@@ -511,25 +608,25 @@
     color: var(--text-primary);
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--baseline);
   }
   .breakeven-table table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 11.5px;
   }
   .breakeven-table th {
     text-align: left;
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--text-muted);
     font-weight: 600;
-    padding: 3px 6px;
+    padding: 4px 8px;
     border-bottom: 1px solid var(--baseline);
   }
   .breakeven-table td {
-    padding: 4px 6px;
+    padding: 5px 8px;
     border-bottom: 1px solid var(--gridline);
   }
   .breakeven-table .swatch {
@@ -547,10 +644,25 @@
   }
 
   .footer-note {
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--text-muted);
     text-align: center;
     padding: 4px 0;
+  }
+
+  @media (max-width: 900px) {
+    .field input, .field select, .preset-select,
+    .scenario-fields input, .scenario-fields textarea { font-size: 16px; }
+    .verdict-tile .v { font-size: 18px; }
+    .main { padding: 14px; gap: 14px; }
+    .sidebar { padding: 14px; }
+  }
+
+  @media (max-width: 640px) {
+    .verdict-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .verdict { padding: 12px 14px; }
+    .verdict-tile .v { font-size: 17px; }
+    .verdict-tile .v.small { font-size: 14px; }
   }
 
   @media print {
@@ -567,12 +679,18 @@
 <div class="top-bar">
   <div>
     <h1>Self-Hosted LLM Cost Calculator</h1>
+    <div class="subtitle">Compare self-hosted cost per token with frontier APIs at your expected demand.</div>
     <div class="scenario-fields">
       <input type="text" id="scenarioName" aria-label="Scenario name" placeholder="Scenario name (e.g. GLM-5.2 on 8×H200)">
       <textarea id="scenarioDesc" aria-label="Scenario description" placeholder="Description (optional)"></textarea>
     </div>
   </div>
-  <button class="btn-print" id="btnPrint">Print</button>
+  <button class="btn-print" id="btnPrint">
+    <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6V2h8v4M4 12H2V6h12v6h-2M4 9h8v5H4z"/>
+    </svg>
+    Print
+  </button>
 </div>
 
 <div id="printOverlay">
@@ -604,109 +722,131 @@
         <div class="hf-results" id="hfResults"></div>
       </div>
 
-      <div class="section-label">Infrastructure</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="gpuType">GPU type</label>
-          <input type="text" id="gpuType" value="H200" placeholder="e.g. H200, H100, A100">
+      <details class="section" open>
+        <summary>Infrastructure</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="gpuType">GPU type</label>
+            <input type="text" id="gpuType" value="H200" placeholder="e.g. H200, H100, A100">
+          </div>
+          <div class="field">
+            <label for="gpusPerNode">GPUs per node</label>
+            <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
+          </div>
         </div>
-        <div class="field">
-          <label for="gpusPerNode">GPUs per node</label>
-          <input type="number" id="gpusPerNode" value="8" min="1" max="144" step="1">
+        <div class="field-row">
+          <div class="field">
+            <label for="numNodes">Number of nodes</label>
+            <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
+          </div>
+          <div class="field">
+            <label for="costPerNode">$/node/month</label>
+            <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
+          </div>
         </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="numNodes">Number of nodes</label>
-          <input type="number" id="numNodes" value="8" min="1" max="128" step="1">
-        </div>
-        <div class="field">
-          <label for="costPerNode">$/node/month</label>
-          <input type="number" id="costPerNode" value="11597.84" min="0" step="100">
-        </div>
-      </div>
+      </details>
 
-      <div class="section-label">Workload Shape</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="concurrency">Concurrency (sessions)</label>
-          <input type="number" id="concurrency" value="128" min="1" step="1">
+      <details class="section" open>
+        <summary>Workload Shape</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="concurrency">Concurrency (sessions)</label>
+            <input type="number" id="concurrency" value="128" min="1" step="1">
+          </div>
+          <div class="field">
+            <label for="cacheHitRate">Cache hit rate (%)</label>
+            <input type="number" id="cacheHitRate" value="87" min="0" max="100" step="1">
+          </div>
         </div>
-        <div class="field">
-          <label for="cacheHitRate">Cache hit rate (%)</label>
-          <input type="number" id="cacheHitRate" value="87" min="0" max="100" step="1">
+        <div class="field-row">
+          <div class="field">
+            <label for="avgIsl">Avg ISL (tokens)</label>
+            <input type="number" id="avgIsl" value="30000" min="1" step="1000">
+          </div>
+          <div class="field">
+            <label for="avgOsl">Avg OSL (tokens)</label>
+            <input type="number" id="avgOsl" value="2000" min="1" step="100">
+          </div>
         </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="avgIsl">Avg ISL (tokens)</label>
-          <input type="number" id="avgIsl" value="30000" min="1" step="1000">
-        </div>
-        <div class="field">
-          <label for="avgOsl">Avg OSL (tokens)</label>
-          <input type="number" id="avgOsl" value="2000" min="1" step="100">
-        </div>
-      </div>
+      </details>
 
-      <div class="section-label">Serving Performance</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="totalGoodput">Total goodput (tok/s)</label>
-          <input type="number" id="totalGoodput" value="96000" min="0" step="100">
+      <details class="section" open>
+        <summary>Serving Performance</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="totalGoodput">Total goodput (tok/s)</label>
+            <input type="number" id="totalGoodput" value="96000" min="0" step="100">
+          </div>
+          <div class="field">
+            <label for="outputTpsPerUser">Output tok/s per user</label>
+            <input type="number" id="outputTpsPerUser" value="32" min="0" step="1">
+          </div>
         </div>
-        <div class="field">
-          <label for="outputTpsPerUser">Output tok/s per user</label>
-          <input type="number" id="outputTpsPerUser" value="32" min="0" step="1">
-        </div>
-      </div>
+      </details>
 
-      <div class="section-label">Demand Estimate</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="numUsers">Number of users</label>
-          <input type="number" id="numUsers" value="200" min="0" step="10">
+      <details class="section" open>
+        <summary>Demand Estimate</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="numUsers">Number of users</label>
+            <input type="number" id="numUsers" value="200" min="0" step="10">
+          </div>
+          <div class="field">
+            <label for="sessionsPerDay">Sessions / user / day</label>
+            <input type="number" id="sessionsPerDay" value="1" min="0" step="0.1">
+          </div>
         </div>
-        <div class="field">
-          <label for="sessionsPerDay">Sessions / user / day</label>
-          <input type="number" id="sessionsPerDay" value="1" min="0" step="0.1">
+        <div class="field-row">
+          <div class="field">
+            <label for="callsPerSession">Avg model calls / session</label>
+            <input type="number" id="callsPerSession" value="251.47" min="0" step="0.01">
+          </div>
+          <div class="field">
+            <label for="workDays">Working days / month</label>
+            <input type="number" id="workDays" value="22" min="1" max="31" step="1">
+          </div>
         </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="callsPerSession">Avg model calls / session</label>
-          <input type="number" id="callsPerSession" value="251.47" min="0" step="0.01">
+        <div class="demand-note">
+          Usage assumption, not benchmark data: a session may contain several tasks, and calls/session includes subagent calls.
+          Weka June 21 means (393 sessions):
+          <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
+          <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button>
+          (<a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
+          <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>).
+          These filtered coding traces favour longer sessions; presets never change this estimate.
         </div>
-        <div class="field">
-          <label for="workDays">Working days / month</label>
-          <input type="number" id="workDays" value="22" min="1" max="31" step="1">
-        </div>
-      </div>
-
-      <div class="demand-note">
-        Sessions/day is your usage assumption, not measured by Weka. A session may contain several tasks.
-        Calls/session includes main-agent and subagent calls.<br>
-        Weka June 21 means (393 sessions):
-        <button type="button" class="demand-reference" data-calls-per-session="251.47" aria-label="Use full-context Weka mean of 251.47 model calls per session">Use full: 251.47</button>
-        <button type="button" class="demand-reference" data-calls-per-session="173.70" aria-label="Use 256k Weka mean of 173.70 model calls per session">Use 256k: 173.70</button><br>
-        Sources: <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126" target="_blank" rel="noopener">full-context</a> /
-        <a href="https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126-256k" target="_blank" rel="noopener">256k</a>.
-        These filtered coding traces favour longer sessions. Choose the matching corpus or edit the estimate; benchmark presets do not change it.
-      </div>
+      </details>
 
       <div id="inputErrors" class="input-errors" role="status" aria-live="polite" hidden></div>
-      <div class="computed-box">
-        <div>Total GPUs: <span class="val" id="totalGpus">—</span> &nbsp; Annual TCO: <span class="val" id="annualTco">—</span> &nbsp; ISL:OSL: <span class="val" id="islOslRatio">—</span></div>
-        <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
-          Self-hosted at 100% util: <span class="val" id="shCostPerM" style="font-size: 13px;">—</span>/M tokens
+    </div>
+
+    <div class="panel" id="resultsPanel">
+      <div class="panel-title">Results</div>
+      <div class="results-grid">
+        <div class="result">
+          <span class="k">Avg utilization</span>
+          <span class="v big" id="derivedUtil">—</span>
         </div>
-        <div style="margin-top: 4px; border-top: 1px solid var(--gridline); padding-top: 4px;">
-          <div>Model calls / user / day: <span class="val" id="dailyCallsPerUser">—</span></div>
-          <div>Monthly token demand: <span class="val" id="monthlyDemand">—</span></div>
-          <div>Avg utilization: <span class="val" id="derivedUtil" style="font-size: 13px;">—</span> &nbsp; Self-hosted cost: <span class="val" id="shCostAtUtil" style="font-size: 13px;">—</span>/M</div>
+        <div class="result">
+          <span class="k">Self-hosted cost at your demand</span>
+          <span class="v big" id="shCostAtUtil">—</span>
+          <span class="unit">per 1M tokens</span>
         </div>
-        <button type="button" class="math-toggle" id="mathToggle" aria-expanded="false" aria-controls="mathExplanation">Show derivation</button>
-        <div class="math-detail" id="mathExplanation"></div>
+        <div class="result">
+          <span class="k">Monthly token demand</span>
+          <span class="v" id="monthlyDemand">—</span>
+        </div>
+        <div class="result">
+          <span class="k">Model calls / user / day</span>
+          <span class="v" id="dailyCallsPerUser">—</span>
+        </div>
       </div>
+      <div class="results-divider">
+        <div>Cost at 100% utilization: <strong id="shCostPerM">—</strong>/M tokens</div>
+        <div>Fleet: <strong id="totalGpus">—</strong> &nbsp;·&nbsp; Annual TCO: <strong id="annualTco">—</strong> &nbsp;·&nbsp; ISL:OSL <strong id="islOslRatio">—</strong></div>
+      </div>
+      <button type="button" class="math-toggle" id="mathToggle" aria-expanded="false" aria-controls="mathExplanation">Show derivation</button>
+      <div class="math-detail" id="mathExplanation"></div>
     </div>
 
     <div class="panel">
@@ -717,8 +857,34 @@
 
   </div>
 
-  <!-- MAIN: chart + breakeven -->
+  <!-- MAIN: verdict, chart, breakeven -->
   <div class="main">
+    <section class="verdict" aria-label="Results at a glance">
+      <div class="verdict-tiles">
+        <div class="verdict-tile">
+          <span class="k">Self-hosted at your demand</span>
+          <span class="v" id="verdictSelfHosted">—</span>
+          <span class="sub">per 1M tokens</span>
+        </div>
+        <div class="verdict-tile">
+          <span class="k">Cheapest enabled API</span>
+          <span class="v" id="verdictBestApi">—</span>
+          <span class="sub" id="verdictBestApiSub">—</span>
+        </div>
+        <div class="verdict-tile">
+          <span class="k">Monthly: fleet vs API</span>
+          <span class="v small" id="verdictBills">—</span>
+          <span class="sub">fleet vs cheapest API</span>
+        </div>
+        <div class="verdict-tile">
+          <span class="k">Average utilization</span>
+          <span class="v" id="verdictUtil">—</span>
+          <span class="sub">of measured capacity</span>
+        </div>
+      </div>
+      <p class="verdict-text" id="verdictText">Calculating…</p>
+    </section>
+
     <div class="chart-wrap">
       <div class="panel-title">Blended Cost per 1M Tokens vs. GPU Utilization</div>
       <p id="chartStatus" class="chart-status" role="status" hidden></p>
@@ -735,7 +901,7 @@
             <th>Frontier Model</th>
             <th>Blended $/M</th>
             <th>Breakeven Util.</th>
-            <th>Monthly API Bill at Estimated Demand</th>
+            <th title="Monthly API bill at the estimated monthly token demand">Monthly API bill</th>
           </tr>
         </thead>
         <tbody id="breakevenBody"></tbody>
@@ -789,7 +955,7 @@
   // Pareto frontier point meeting a 35 tok/s per-user interactivity target.
   // Demand-estimate inputs retain the user's current values.
   const SCENARIO_PRESETS = [
-    { id: 'glm-5-2-gb200', label: 'GLM-5.2 · GB200 NVL72 · 135k:1k ISL:OSL, 76% cache', short: 'GLM-5.2 GB200', featured: true,
+    { id: 'glm-5-2-gb200', label: 'GLM-5.2 · GB200 NVL72 · 135k:1k ISL:OSL, 76% cache', short: 'GLM-5.2 GB200', featured: false,
       source: { model: 'GLM-5.2', hardware: 'gb200', framework: 'dynamo-sglang', precision: 'fp4', disagg: true, concurrency: 336, date: '2026-10-23', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39765601214/attempts/2', gpuHourRate: 4 },
       values: { gpuType: 'GB200 NVL72', gpusPerNode: 40, numNodes: 1, costPerNode: 116800, concurrency: 336, cacheHitRate: 76, avgIsl: 134590, avgOsl: 1001, totalGoodput: 1690897, outputTpsPerUser: 104.3 } },
     { id: 'kimi-k3-tpuv7', label: 'Kimi-K3 · TPU7x · 144k:1k ISL:OSL, 60.4% cache', short: 'Kimi-K3 TPU7x', featured: true,
@@ -801,7 +967,7 @@
     { id: 'glm-5-2-h200', label: 'GLM-5.2 · H200 · 91k:1k ISL:OSL, 6.5% cache', short: 'GLM-5.2 H200', featured: false,
       source: { model: 'GLM-5.2', hardware: 'h200', framework: 'dynamo-sglang', precision: 'fp8', disagg: false, concurrency: 12, date: '2026-09-18', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35177419428/attempts/1', gpuHourRate: 2.9 },
       values: { gpuType: 'H200', gpusPerNode: 8, numNodes: 1, costPerNode: 16936, concurrency: 12, cacheHitRate: 6.5, avgIsl: 91287, avgOsl: 864, totalGoodput: 22148, outputTpsPerUser: 188.7 } },
-    { id: 'glm-5-2-b200', label: 'GLM-5.2 · B200 · 155k:1k ISL:OSL, 92.8% cache', short: 'GLM-5.2 B200', featured: false,
+    { id: 'glm-5-2-b200', label: 'GLM-5.2 · B200 · 155k:1k ISL:OSL, 92.8% cache', short: 'GLM-5.2 B200', featured: true,
       source: { model: 'GLM-5.2', hardware: 'b200', framework: 'dynamo-sglang', precision: 'fp4', disagg: false, concurrency: 32, date: '2026-10-22', runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/39626904306/attempts/1', gpuHourRate: 3.7 },
       values: { gpuType: 'B200', gpusPerNode: 8, numNodes: 1, costPerNode: 21608, concurrency: 32, cacheHitRate: 92.8, avgIsl: 155205, avgOsl: 997, totalGoodput: 160111, outputTpsPerUser: 98.3 } },
     { id: 'glm-5-2-mi355x', label: 'GLM-5.2 · MI355X · 128k:1k ISL:OSL, 76.7% cache', short: 'GLM-5.2 MI355X', featured: false,
@@ -1226,6 +1392,59 @@
     });
   }
 
+  // --- At-a-glance verdict ---
+  function updateVerdict(result) {
+    const set = (id, text) => { $(id).textContent = text; };
+    if (!result.valid) {
+      set('verdictSelfHosted', 'N/A');
+      set('verdictBestApi', 'N/A');
+      set('verdictBestApiSub', 'correct inputs');
+      set('verdictBills', 'N/A');
+      $('verdictUtil').textContent = 'N/A';
+      $('verdictUtil').classList.remove('warn');
+      $('verdictText').textContent = 'Correct the highlighted inputs to compare self-hosting with frontier APIs.';
+      return;
+    }
+    const { costPerMAt100, costAtDerivedUtil, derivedUtil, overloaded, monthlyCost, monthlyDemand, frontierResults } = result;
+    const best = frontierResults.reduce((a, b) => (!a || b.blended < a.blended ? b : a), null);
+    const utilText = derivedUtil === null ? 'N/A' : fmt(derivedUtil, 1) + '%' + (overloaded ? ' — over capacity' : '');
+    set('verdictSelfHosted', costAtDerivedUtil === null ? 'N/A' : fmtDollar(costAtDerivedUtil, 2));
+    set('verdictBestApi', best ? `${fmtDollar(best.blended, 2)}/M` : 'N/A');
+    set('verdictBestApiSub', best ? best.name : 'enable a model');
+    set('verdictBills', `${fmtDollar(monthlyCost)} vs ${best ? fmtDollar(best.monthlyFrontierCost) : '—'}`);
+    $('verdictUtil').textContent = utilText;
+    $('verdictUtil').classList.toggle('warn', Boolean(overloaded));
+
+    if (costPerMAt100 === null) {
+      $('verdictText').textContent = 'Total goodput is zero, so the fleet has no measured capacity and self-hosted cost per token is undefined. Enter the measured goodput for this deployment.';
+      return;
+    }
+    if (monthlyDemand === 0) {
+      $('verdictText').textContent = 'Estimated demand is zero, so there is no API bill or self-hosted cost per token yet. Raise users, sessions, or working days to compare.';
+      return;
+    }
+    if (!best) {
+      $('verdictText').textContent = 'Enable at least one frontier model in the pricing list to compare self-hosting with API costs.';
+      return;
+    }
+    const apiName = esc(best.name);
+    if (overloaded) {
+      $('verdictText').innerHTML = `Estimated demand exceeds the fleet's measured capacity at <strong>${esc(utilText)}</strong>. Add capacity or lower demand; self-hosted cost per token is undefined above capacity.`;
+      return;
+    }
+    const sh = fmtDollar(costAtDerivedUtil, 2);
+    const api = fmtDollar(best.blended, 2);
+    if (costAtDerivedUtil <= best.blended) {
+      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong> — below every enabled frontier API. Nearest is ${apiName} at ${api}/M.`;
+    } else {
+      const be = best.breakeven;
+      const beText = be === null ? ''
+        : be <= 100 ? ` Break-even with ${apiName} is at <strong>${fmt(be, 1)}%</strong> utilization.`
+        : ` ${apiName} needs more than 100% utilization to break even at this capacity.`;
+      $('verdictText').innerHTML = `At <strong>${fmt(derivedUtil, 1)}%</strong> average utilization, self-hosting costs <strong>${sh}/M</strong> — the cheapest enabled API, ${apiName} at ${api}/M, is less expensive.${beText}`;
+    }
+  }
+
   // --- Core cost computation ---
   function compute() {
     const gpuType = $('gpuType').value.trim() || 'GPU';
@@ -1241,6 +1460,7 @@
       $('mathExplanation').textContent = 'Correct the highlighted inputs to calculate this scenario.';
       document.querySelectorAll('.frontier-blended-val').forEach(el => { el.textContent = 'N/A'; });
       document.querySelectorAll('.frontier-blended-math').forEach(el => { el.textContent = ''; });
+      updateVerdict(result);
       return result;
     }
     const { gpusPerNode, numNodes, costPerNode, totalGoodput, avgIsl, avgOsl, numUsers, sessionsPerDay, callsPerSession, workDays } = values;
@@ -1307,6 +1527,7 @@
       }
     });
 
+    updateVerdict(result);
     return result;
   }
 
@@ -1328,10 +1549,11 @@
     const curveMax = selfHostedCosts[0] || 0;
     const maxY = Math.max(curveMax * 1.05, maxFrontier * 1.2) || 1;
 
+    const compact = window.innerWidth < 640;
     const datasets = [
       {
         label: `Self-Hosted ${selectedModel}`,
-        data: selfHostedCosts,
+        data: selfHostedCosts.map((y, i) => ({ x: utilizations[i], y })),
         borderColor: SELF_HOSTED_COLOR,
         backgroundColor: 'rgba(204,0,0,0.04)',
         borderWidth: 2.5,
@@ -1346,7 +1568,7 @@
       },
       ...frontierResults.map(m => ({
         label: `${m.name} ($${fmt(m.blended)}/M)`,
-        data: Array(100).fill(m.blended),
+        data: utilizations.map(u => ({ x: u, y: m.blended })),
         borderColor: m.color,
         borderWidth: 2,
         borderDash: [8, 4],
@@ -1359,7 +1581,7 @@
 
     if (typeof Chart === 'function') chart = new Chart($('costChart'), {
       type: 'line',
-      data: { labels: utilizations, datasets },
+      data: { datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1367,8 +1589,11 @@
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: {
+            type: 'linear',
+            min: 1,
+            max: 100,
             title: { display: true, text: 'Average Utilization (% of capacity)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
-            ticks: { stepSize: 10, color: '#898781', font: { size: 10 } },
+            ticks: { stepSize: 10, color: '#6b6a65', font: { size: 10 }, callback: v => String(v) },
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },
           },
@@ -1376,19 +1601,21 @@
             title: { display: true, text: 'Blended Cost per 1M Tokens ($)', font: { size: 11, family: 'system-ui' }, color: '#52514e' },
             min: 0,
             max: maxY,
-            ticks: { color: '#898781', font: { size: 10 }, callback: v => '$' + Number(v.toFixed(2)) },
+            ticks: { color: '#6b6a65', font: { size: 10 }, callback: v => '$' + fmt(v, maxY >= 10 ? 0 : 2) },
             grid: { color: '#e1e0d9', lineWidth: 1 },
             border: { color: '#c3c2b7' },
           },
         },
         plugins: {
           legend: {
-            position: 'top',
+            display: !compact,
+            position: 'bottom',
             labels: {
               font: { size: 10, family: 'system-ui' },
               color: '#52514e',
               usePointStyle: true,
-              pointStyleWidth: 16,
+              pointStyle: 'line',
+              boxWidth: 18,
               padding: 10,
             },
           },
@@ -1403,7 +1630,7 @@
             titleFont: { size: 11, weight: '700', family: 'system-ui' },
             bodyFont: { size: 10, family: 'system-ui' },
             callbacks: {
-              title: items => `Utilization: ${items[0].label}%`,
+              title: items => `Utilization: ${items[0].parsed.x}%`,
               label: item => {
                 const name = item.dataset.label.split(' ($')[0];
                 return ` ${name}: $${item.parsed.y.toFixed(2)}/M`;
@@ -1422,7 +1649,7 @@
           // Breakeven dots
           frontierResults.forEach(m => {
             if (m.breakeven >= 1 && m.breakeven <= 100 && m.blended <= maxY) {
-              const x = xScale.getPixelForValue(m.breakeven - 1);
+              const x = xScale.getPixelForValue(m.breakeven);
               const y = yScale.getPixelForValue(m.blended);
               ctx.save();
               ctx.beginPath();
@@ -1433,9 +1660,17 @@
               ctx.arc(x, y, 4, 0, Math.PI * 2);
               ctx.fillStyle = m.color;
               ctx.fill();
-              ctx.fillStyle = m.color;
-              ctx.font = '600 10px system-ui';
-              ctx.fillText(Math.round(m.breakeven) + '%', x + 8, y - 6);
+              // Percentage labels collide on narrow charts; the table keeps them.
+              if (!compact) {
+                ctx.fillStyle = m.color;
+                ctx.font = '600 10px system-ui';
+                const text = Math.round(m.breakeven) + '%';
+                const width = ctx.measureText(text).width;
+                const scenarioX = xScale.getPixelForValue(Math.min(derivedUtil, 100));
+                const lx = x + 8 + width > xScale.right - 2 ? x - width - 8 : x + 8;
+                const ly = Math.abs(x - scenarioX) < 42 ? y + 15 : y - 6;
+                ctx.fillText(text, lx, ly);
+              }
               ctx.restore();
             }
           });
@@ -1444,7 +1679,7 @@
           const clampedUtil = Math.min(derivedUtil, 100);
           if (clampedUtil >= 1 && clampedUtil <= 100) {
             const scenarioCost = costPerMAt100 / (clampedUtil / 100);
-            const x = xScale.getPixelForValue(clampedUtil - 1);
+            const x = xScale.getPixelForValue(clampedUtil);
             const yTop = yScale.top;
             const yBottom = yScale.bottom;
 
@@ -1580,7 +1815,8 @@
       ${titleHtml}
       ${descHtml}
       ${$('inputErrors').hidden ? '' : `<p>${esc($('inputErrors').textContent)}</p>`}
-      <p style="font-size:11px;color:#898781;margin:0 0 20px;">${new Date().toLocaleDateString()}</p>
+      <p style="font-size:11px;color:#6b6a65;margin:0 0 8px;">${new Date().toLocaleDateString()}</p>
+      <p style="font-size:12px;line-height:1.5;color:#0b0b0b;background:#f9f9f7;border:1px solid #e1e0d9;border-radius:6px;padding:8px 10px;margin:0 0 16px;">${esc($('verdictText').textContent)}</p>
 
       <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
         <div>
@@ -1621,6 +1857,11 @@
   window.addEventListener('beforeprint', buildPrintView);
 
   // --- Init ---
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(render, 150);
+  });
   initPresets();
   useFallbackPricing();
   loadFrontierPricing();

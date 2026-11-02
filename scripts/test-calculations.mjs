@@ -147,8 +147,53 @@ test('every preset maps all benchmark fields and preserves edited demand inputs'
   };
   app.presets.forEach((preset, i) => { app.preset(i); verify(preset); });
   const buttons = [...app.$('presetQuick').querySelectorAll('button')];
-  assert.equal(buttons.length, 3);
+  const featured = app.presets.filter(p => p.featured);
+  assert.ok(featured.length >= 1 && featured.length <= 3, 'one to three featured presets');
+  assert.equal(buttons.length, featured.length);
   buttons.forEach(button => { button.click(); verify(app.presets.find(p => p.id === button.dataset.presetId)); });
+});
+
+test('at-a-glance verdict reflects demand, capacity and model selection states', async t => {
+  const app = await createApp(t);
+  const verdict = () => app.$('verdictText').textContent;
+
+  app.compute();
+  assert.match(verdict(), /cheapest enabled API/);
+  assert.match(verdict(), /Break-even with GPT-6\.1 Terra/);
+  assert.notEqual(app.$('verdictSelfHosted').textContent, 'N/A');
+  assert.match(app.$('verdictBestApi').textContent, /^\$\S+\/M$/);
+  assert.match(app.$('verdictBills').textContent, / vs /);
+  assert.match(app.$('verdictUtil').textContent, /^14/);
+
+  app.set('numUsers', 1400);
+  assert.match(verdict(), /below every enabled frontier API/);
+
+  app.set('numUsers', 0);
+  assert.match(verdict(), /demand is zero/);
+  assert.equal(app.$('verdictSelfHosted').textContent, 'N/A');
+
+  app.set('numUsers', 200);
+  app.set('totalGoodput', 0);
+  assert.match(verdict(), /no measured capacity/);
+  assert.equal(app.$('verdictSelfHosted').textContent, 'N/A');
+
+  app.set('totalGoodput', 96000);
+  app.set('sessionsPerDay', 10);
+  assert.match(verdict(), /exceeds the fleet's measured capacity/);
+  assert.equal(app.$('verdictUtil').classList.contains('warn'), true);
+
+  app.set('sessionsPerDay', 1);
+  const doc = app.window.document;
+  const checkboxes = [...doc.querySelectorAll('.frontier-list input[type="checkbox"]')];
+  checkboxes.forEach(cb => { if (cb.checked) cb.click(); });
+  assert.match(verdict(), /Enable at least one frontier model/);
+  assert.equal(app.$('verdictBestApi').textContent, 'N/A');
+
+  checkboxes[0].click();
+  assert.match(app.$('verdictBestApiSub').textContent, /Claude Opus 5\.5/);
+
+  app.set('cacheHitRate', 200);
+  assert.match(verdict(), /Correct the highlighted inputs/);
 });
 
 test('benchmark edits clear measured attribution; demand edits preserve it', async t => {

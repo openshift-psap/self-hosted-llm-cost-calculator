@@ -129,7 +129,17 @@ explicit user decision. TCO = nodes × $/node/month × 12.
 All displayed values cap at 2 decimal places — **except cached input prices,
 which keep 3** (they can be sub-cent, e.g. $0.003/M). The chart y-axis
 auto-scales: `max(self-hosted curve at 1% util × 1.05, max frontier blended × 1.2)`,
-no fixed floor or cap.
+no fixed floor or cap. The x-axis is linear from 1–100% with 10-point ticks.
+Below 640px the chart hides its legend and breakeven percentage labels (the
+table retains them) to avoid collisions.
+
+The main column opens with an at-a-glance strip (self-hosted $/M at demand,
+cheapest enabled API, monthly fleet vs API bills, utilization) and a generated
+verdict sentence. Its wording is derived, never hardcoded: API-cheaper,
+self-hosted-cheaper, zero-demand, zero-capacity, overloaded, no-model-selected
+and invalid-input states are distinct. The sidebar "Results" panel mirrors the
+demand-based numbers and keeps the 100%-utilization floor and derivation below
+a divider. Input sections are native `<details>` accordions, open by default.
 
 ## Frontier comparison rules
 
@@ -201,9 +211,8 @@ Preset labels carry the workload shape (`GLM-5.2 · GB200 NVL72 · 135k:1k
 ISL:OSL, 76% cache`). **Serving framework names never appear in the UI** (they
 remain in the baked data and the linked run). The provenance caption shows
 precision, concurrency, tok/s/user, date, run URL, and the node-cost
-derivation. Three featured presets get quick-select buttons; the featured trio
-is chosen for variety (currently GLM-5.2/GB200, Kimi-K3/TPU7x,
-Muse-Spark-Open/MI355X).
+derivation. Featured presets get quick-select buttons (up to three); the featured set is
+chosen deliberately (currently GLM-5.2/B200, Kimi-K3/TPU7x, Muse-Spark-Open/MI355X).
 
 ## InferenceX API gotchas
 

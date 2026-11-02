@@ -12,6 +12,7 @@ Key features:
 - **Live frontier pricing** fetched from the [OpenRouter API](https://openrouter.ai/api/v1/models) — no API key required
 - **Built-in pricing snapshot** for offline use and as a fallback when the API is unavailable
 - **Scenario presets** — measured operating points from [InferenceX](https://inferencex.semianalysis.com) agentic-traces benchmark runs (model × hardware, with provenance links), quick-select buttons for the top three
+- **At-a-glance verdict** — the self-hosted $/M at your demand, the cheapest enabled API, monthly fleet vs API bills, utilization, and a plain-language conclusion are summarized above the chart
 - **HuggingFace model search** for labeling the self-hosted model
 - **Workload-aware blended cost** — accounts for the ISL:OSL token mix and prompt cache hit rate, which heavily influence frontier API costs for agentic workloads
 - **Measured capacity** — uses the fleet's measured total goodput directly, without extrapolating prefill/decode performance
@@ -108,8 +109,8 @@ The sidebar offers preset scenarios built from measured [InferenceX](https://inf
 agentic-traces benchmark runs on vLLM- and SGLang-family serving stacks — real
 single runs with full provenance. Preset names carry the workload shape
 (ISL:OSL mix and measured cache hit rate); the serving framework is not shown
-in the UI (it remains in the baked data and the linked run). Three featured
-presets have quick-select buttons; the dropdown lists the full catalog.
+in the UI (it remains in the baked data and the linked run). Featured presets
+get quick-select buttons (up to three); the dropdown lists the full catalog.
 
 Each preset fills the infrastructure, workload-shape, and serving-performance
 fields from one benchmark run:
